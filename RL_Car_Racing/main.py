@@ -6,7 +6,7 @@ import torch
 NUM_EPISODES = int(1e6)
 MEM_LEN = int(1e5)
 SEED = 1
-BATCH_SIZE = 32
+BATCH_SIZE = 256
 
 def train(config: str):
 

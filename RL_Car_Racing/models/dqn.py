@@ -5,11 +5,17 @@ import numpy as np
 import time
 from utils import WandBLogger
 
+#TODO 
+'''
+- need to push items to the gpu only when they need to go there
+- the experience buffer should be on cpu not gpu
+'''
+
 
 class DQNAgent():
     def __init__(self, env, memory_size, batch_size):
 
-        self.total_steps = 0 
+        self.total_steps = 1 
         self.current_episode = 1
         self.network_update = 100
 
@@ -90,7 +96,7 @@ class DQNAgent():
         if tj:
             return rj.to(self.device)
         else:
-            return rj.to(self.device) + self.gamma * self.q_net(sj.unsqueeze(0))
+            return (rj.to(self.device) + self.gamma * self.q_net(sj.unsqueeze(0))).squeeze()
 
 
     def _epsilonDecay(self):

@@ -14,7 +14,7 @@ class WandBLogger:
                             "step_update": 100,
                             "epsilon": 0.1,
                             "memory_size": 1e6,
-                            "batch_size": 32,
+                            "batch_size": 256,
                             "loss": "mse",
                             "optimizer": "AdamW"
                             })
