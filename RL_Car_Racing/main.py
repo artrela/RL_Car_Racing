@@ -12,7 +12,7 @@ def train(config: str):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     env = gym.make("CarRacing-v3")
-    env = numpy_to_torch.NumpyToTorch(env, device=device)
+    env = numpy_to_torch.NumpyToTorch(env, device='cpu')
     env = TransformObservation(env, lambda x: torch.permute(x, (2, 0, 1)).float(), env.observation_space)
 
     agent = DQNAgent(env, memory_size=MEM_LEN, batch_size=BATCH_SIZE)
@@ -20,26 +20,26 @@ def train(config: str):
 
     agent.fillMemory()
 
-    terminated = truncated = False
-
-    prev_observation, info = env.reset(seed=SEED)
-    # prev_observation = prev_observation.float()
 
     action = env.action_space.sample()
-    action = torch.tensor(action).float().to(agent.q_net.device)
+    action = torch.tensor(action).float()
 
     for e in range(NUM_EPISODES):
 
         print("Starting episode:", e+1, "/", NUM_EPISODES)
+        prev_observation, info = env.reset(seed=SEED)
 
-        while not terminated or truncated:
+        terminated = truncated = False
+
+        while not (terminated or truncated):
 
             observation, reward, terminated, truncated, info = env.step(action)
 
             action = agent(prev_observation, action, reward, observation, terminated or truncated)
             
             if terminated or truncated:
-                prev_observation, info = env.reset(seed=SEED)
+                print(15*"=", "Episode End", 15*"=")
+                continue
 
             prev_observation = observation.detach().clone()
 

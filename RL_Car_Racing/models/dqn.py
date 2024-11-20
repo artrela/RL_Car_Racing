@@ -16,6 +16,7 @@ class DQNAgent():
     def __init__(self, env, memory_size, batch_size):
 
         self.total_steps = 1 
+        self.episode_steps = 1
         self.current_episode = 1
         self.network_update = 100
 
@@ -34,7 +35,7 @@ class DQNAgent():
 
         self.rets = []
         self.epi_start = time.time()
-        self.wb = WandBLogger()    
+        # self.wb = WandBLogger()    
 
     def __call__(self, s0, a0, r0, s1, t): 
 
@@ -63,6 +64,7 @@ class DQNAgent():
             del q_pred, targets
             torch.cuda.empty_cache()
         
+        
         self._trackProgress(t) 
         
         return next_action
@@ -84,10 +86,10 @@ class DQNAgent():
 
     def _prepareMinibatch(self, experiences):
         
-        targets = torch.stack([self.yj(memory.terminal, memory.reward, memory.next_state) 
-                            for memory in experiences], dim=0).squeeze()
+        targets = torch.stack([self.yj(memory.terminal, memory.reward, memory.next_state)
+                            for memory in experiences], dim=0).squeeze().to(self.device)
         
-        states  = torch.stack([memory.state for memory in experiences], dim=0)
+        states  = torch.stack([memory.state for memory in experiences], dim=0).to(self.device)
 
         return targets, states
     
@@ -96,7 +98,7 @@ class DQNAgent():
         if tj:
             return rj.to(self.device)
         else:
-            return (rj.to(self.device) + self.gamma * self.q_net(sj.unsqueeze(0))).squeeze()
+            return (rj.to(self.device) + self.gamma * self.q_net(sj.unsqueeze(0).to(self.device))).squeeze()
 
 
     def _epsilonDecay(self):
@@ -109,8 +111,8 @@ class DQNAgent():
         if P < 1 - self.epsilon:
             with torch.no_grad(): 
                 state = self.exp_replay.getCurrentExperience().state
-                action = self.q_net(state.unsqueeze(0)) 
-                action = self._clipAction(action).squeeze()
+                action = self.q_net(state.unsqueeze(0).to(self.device)) 
+                action = self._clipAction(action).squeeze().detach()
         else:
             action = torch.tensor(self.env.action_space.sample()).float()
 
@@ -127,21 +129,28 @@ class DQNAgent():
 
         if episode_end:
 
-            self.current_episode += 1 
+            if self.current_episode > 1:
 
-            stats = {
-                "eps": self.epsilon,
-                "epi_tot_rets": sum(self.rets),
-                "epi_avg_rets": sum(self.rets)/len(self.rets),
-                "epi_dur_seconds": round(time.time() - self.epi_start, 2)
-            }
+                stats = {
+                    "eps": self.epsilon,
+                    "epi_tot_rets": sum(self.rets),
+                    "epi_avg_rets": sum(self.rets)/len(self.rets),
+                    "epi_dur_seconds": round(time.time() - self.epi_start, 2)
+                }
+
+                # self.wb.send_log(stats)
+    
+            self.current_episode += 1 
+            self.episode_steps = 0 
 
             self.epi_start = time.time()
             self.rets = []
         
         self.total_steps += 1
+        self.episode_steps += 1
 
-
+        if self.episode_steps % 1000 == 0:
+            print(f"Total Steps: {self.total_steps} Memory Capacity: {len(self.exp_replay)/self.exp_replay.memory_length:.2%}")
 
         return
         
@@ -171,6 +180,7 @@ class ExperienceReplay():
 
         self.Experience = namedtuple("Experience", ["state", "reward", "action", "next_state", "terminal"])
         self._replay_memory = deque(maxlen=memory_length)
+        self.memory_length = memory_length
 
     def storeExperience(self, s0, a0, r0, s1, t):
 
