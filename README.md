@@ -16,7 +16,7 @@ An introduction to common reinforcement methods (RL) leveraging Gymnasium (forme
 
 1. Install [miniconda](https://docs.anaconda.com/miniconda/miniconda-install/) and setup an environment:
 ```bash
-conda env create -n rl-mrsd python=3.10 -y 
+conda create -n rl-mrsd python=3.10 -y 
 conda activate rl-mrsd
 ```
 
@@ -28,7 +28,7 @@ conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvi
 
 3. After installing PyTorch, install the rest of the requirements with:
 ```bash
-pip install requirments.txt
+pip install -r requirments.txt
 # Confirm that installation has been completed successfully by running the following test(s):
 pytest -m gpu 
 ```
