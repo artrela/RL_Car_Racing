@@ -6,17 +6,19 @@ class WandBLogger:
         wandb.login()
 
         self.run = wandb.init(project=project_name,
-                        name = "baseline",
+                        name = "discrete-explore",
                         config = {
-                            "learning_rate": 0.001,
-                            "gamma": 0.9,
-                            "episodes": 1e6,
-                            "step_update": 100,
+                            "learning_rate": 0.0005,
+                            "gamma": 0.96,
+                            "episodes": 1000,
+                            "step_update": 10,
                             "epsilon": 0.1,
-                            "memory_size": 1e6,
-                            "batch_size": 256,
+                            "memory_size": 1e5,
+                            "batch_size": 64,
+                            "episode_decay": 350,
                             "loss": "mse",
-                            "optimizer": "AdamW"
+                            "optimizer": "AdamW",
+                            "notes": "reward gas, penalize nothing, dec lr, increase mem buffer, increase eps decay, introduce domain randomization in env"
                             })
         
     def send_log(self, statistics):
