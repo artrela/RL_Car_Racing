@@ -96,7 +96,9 @@ class DQNAgent():
                 r0 += 10
             elif a0 == 0:
                 r0 -= 10
-            
+                
+            self.epi_selected_actions[a0] += 1
+                
             self.exp_replay.storeExperience(s0, a0, r0, s1, ter or trunc)
         
         self.env.reset()
@@ -171,12 +173,14 @@ class DQNAgent():
                 self.wb.send_log(stats)
 
             print(f"Steps in Episode: {self.episode_steps}")
+            print(f"Actions in Episode: {self.epi_selected_actions}")
             
             self.current_episode += 1 
             self.episode_steps = 0 
 
             self.epi_start = time.time()
             self.rets = []
+            self.epi_selected_actions = [0 for _ in range(5)]
         
         self.total_steps += 1
         self.episode_steps += 1
