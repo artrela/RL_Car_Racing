@@ -20,7 +20,8 @@ class DQNAgent():
         self.total_steps = 1 
         self.episode_steps = 1
         self.current_episode = 1
-        self.network_update = 10
+        self.network_update = 1
+        self.target_update  = 5
 
         self.epsilon = 0.1
         self.gamma = 0.96
@@ -31,6 +32,8 @@ class DQNAgent():
         self.env = env   # experience replay parameters
         
         self.q_net = QNetwork(action_space=env.action_space.n)
+        self.target_net = QNetwork(action_space=env.action_space.n)
+
         self.device = self.q_net.device
         self.optim = torch.optim.AdamW(params=self.q_net.parameters(), lr=0.0005)
         self.loss_fn = torch.nn.MSELoss()
@@ -122,7 +125,7 @@ class DQNAgent():
         else:
             # return (rj.to(self.device) + self.gamma * self.q_net(sj.unsqueeze(0).to(self.device))).squeeze()
             with torch.no_grad():
-                Qs = self.q_net(sj.unsqueeze(0).to(self.device)).squeeze().cpu().numpy()
+                Qs = self.target_net(sj.unsqueeze(0).to(self.device)).squeeze().cpu().numpy()
                 
             # breakpoint()
                 
@@ -143,6 +146,8 @@ class DQNAgent():
         else:
             # action = torch.tensor(self.env.action_space.sample()).int()
             action = self.env.action_space.sample()
+
+        self.epi_selected_actions[action] += 1
 
         return action
     
@@ -166,7 +171,7 @@ class DQNAgent():
                     "epi_dur_seconds": round(time.time() - self.epi_start, 2),
                     "tot_steps": self.total_steps,
                     "epi_avg_q": sum(self.epi_qs)/len(self.epi_qs),
-                    "epi_avg_loss": sum(self.epi_losses)/len(self.epi_losses) 
+                    "epi_avg_loss": sum(self.epi_losses)/len(self.epi_losses)
                 }
 
                 print(f"Episode Times: {stats['epi_dur_seconds']}")
@@ -181,6 +186,9 @@ class DQNAgent():
             self.epi_start = time.time()
             self.rets = []
             self.epi_selected_actions = [0 for _ in range(5)]
+
+            if self.current_episode % self.target_update == 0:
+                self.target_net.load_state_dict(self.q_net.state_dict())
         
         self.total_steps += 1
         self.episode_steps += 1

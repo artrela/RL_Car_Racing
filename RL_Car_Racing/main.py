@@ -37,6 +37,11 @@ def train(config: str):
 
             observation, reward, terminated, truncated, info = env.step(action)
 
+            if action == 3:
+                reward += 10
+            elif action == 0:
+                reward -= 10
+
             action = agent(prev_observation, action, reward, observation, terminated or truncated)
             
             if terminated or truncated:
