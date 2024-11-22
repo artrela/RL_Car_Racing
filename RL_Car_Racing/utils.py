@@ -6,7 +6,7 @@ class WandBLogger:
         wandb.login()
 
         self.run = wandb.init(project=project_name,
-                        name = "ddqn-explore-fix",
+                        name = "ddqn-explore-fix-2",
                         config = {
                             "learning_rate": 0.0005,
                             "gamma": 0.96,
@@ -19,7 +19,7 @@ class WandBLogger:
                             "loss": "mse",
                             "optimizer": "AdamW",
                             "target_net_update": 5, 
-                            "notes": "reward gas, penalize nothing, dec lr, increase mem buffer, increase eps decay, introduce domain randomization in env"
+                            "notes": "reward gas, penalize nothing, dec lr, increase mem buffer, increase eps decay, remove domain randomization in env"
                             })
         
     def send_log(self, statistics):

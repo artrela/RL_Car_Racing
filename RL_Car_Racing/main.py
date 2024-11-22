@@ -2,7 +2,7 @@ import gymnasium as gym
 from models.dqn import DQNAgent
 from gymnasium.wrappers import GrayscaleObservation, FrameStackObservation, TransformObservation, ClipAction, numpy_to_torch
 import torch
-    
+
 NUM_EPISODES = int(1000)
 MEM_LEN = int(1e5)
 SEED = 1
@@ -11,7 +11,7 @@ BATCH_SIZE = 64
 def train(config: str):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    env = gym.make("CarRacing-v3", domain_randomize=True, continuous=False)
+    env = gym.make("CarRacing-v3", domain_randomize=False, continuous=False)
     env = GrayscaleObservation(env, keep_dim=False)
     env = FrameStackObservation(env, stack_size=4)
     # env = numpy_to_torch.NumpyToTorch(env, device='cpu')

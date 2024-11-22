@@ -86,7 +86,7 @@ class DQNAgent():
     
     def fillMemory(self):
 
-        s0, _ = self.env.reset()
+        s0, _ = self.env.reset(seed=1)
 
         while len(self.exp_replay) < self._batch_size:
 
@@ -104,7 +104,7 @@ class DQNAgent():
                 
             self.exp_replay.storeExperience(s0, a0, r0, s1, ter or trunc)
         
-        self.env.reset()
+        self.env.reset(seed=1)
 
         return
 
