@@ -6,20 +6,20 @@ class WandBLogger:
         wandb.login()
 
         self.run = wandb.init(project=project_name,
-                        name = "ddqn-explore-fix-2",
+                        name = "local-custom-actions",
                         config = {
                             "learning_rate": 0.0005,
-                            "gamma": 0.96,
+                            "gamma": 0.95,
                             "episodes": 1000,
                             "step_update": 10,
                             "epsilon": 0.1,
                             "memory_size": 1e5,
                             "batch_size": 64,
-                            "episode_decay": 350,
+                            "episode_decay": 300,
                             "loss": "mse",
                             "optimizer": "AdamW",
-                            "target_net_update": 5, 
-                            "notes": "reward gas, penalize nothing, dec lr, increase mem buffer, increase eps decay, remove domain randomization in env"
+                            "target_net_update": 2, 
+                            "notes": "action space changes"
                             })
         
     def send_log(self, statistics):
