@@ -1,99 +1,135 @@
-import torch
+# ==============================================================================
+# Created by: Alec Trela
+# GitHub: https://github.com/artrela
+# Description: Classes related to a DQN RL agent
+#
+# This is included as a part of the MRSD bootcamp, meant to be a primer for students
+# entering their first year of the program at Carnegie Mellon University 
+# 
+# Feel free to use, modify, and share this file. Attribution is appreciated! 
+# For more information, visit my GitHub or 
+# https://github.com/RoboticsKnowledgebase/mrsd-software-bootcamp.
+# ==============================================================================
+
 from collections import namedtuple, deque
-import random
-import numpy as np
-import time
-import gc
 from utils import WandBLogger
+from typing import List, NamedTuple, Optional
+import gc
+import gymnasium
+import numpy as np
+import random
+import torch
 
-#TODO 
-'''
-- need to push items to the gpu only when they need to go there
-- the experience buffer should be on cpu not gpu
-'''
-
-# 0: steering [-1, 1]
-# 1: gas [0, 1]
-# 2: braking [0, 1]
-action_space = [
-        np.array([    0,   1,   0]), # all gas, no break
-        np.array([    0,   0.8,   0]), # all gas, no break
-        np.array([   -1,   0,   0]), # hard left
-        np.array([    1,   0,   0]), # hard right
-        np.array([-0.67,   0,   0]), # soft left
-        np.array([ 0.67,   0,   0]), # soft left
-        np.array([-0.33,   0,   0]), # soft right
-        np.array([ 0.33,   0,   0]), # soft right
-        np.array([    0,   0, 1.0]), # break left
+# ==============================================================================
+# DQN Action Space Discretization
+#   
+# A Deep Q-network helps to approximate a Q-table (for future rewards) for a set 
+# of discrete actions, which means a DQN requires a set of finite actions. It was
+# found that the given # set of discrete states provided by the Car Racing 
+# environment is inadequate for learning. As such it is up to you to create a 
+# list of actions that could help the agent learn how to drive. 
+# 
+# Action (len(3)): [steering, gas, break]
+# 1. Steering: A continuous value between [-1, 1] representing the steering 
+#    angle of the agent's vehicle.
+# 2. Gas: A binary action [0, 1], where 0 represents no acceleration and 1 
+#    represents full acceleration.
+# 3. Braking: A binary action [0, 1], where 0 represents no braking and 1 
+#    represents full braking.
+# 
+# ==============================================================================
+ACTION_SPACE: List[np.ndarray] = [
+        np.array([    0,   1,    0]), # all gas, no break
+        np.array([    0, 0.8,    0]), # all gas, no break
+        np.array([   -1,   0,    0]), # hard left
+        np.array([    1,   0,    0]), # hard right
+        np.array([-0.67,   0,    0]), # soft left
+        np.array([ 0.67,   0,    0]), # soft left
+        np.array([-0.33,   0,    0]), # soft right
+        np.array([ 0.33,   0,    0]), # soft right
+        np.array([    0,   0,  1.0]), # break left
         np.array([    0,   0, 0.67]), # break left
-        np.array([    0,   0, 0.3]), # break right
-        np.array([    0,   0,   0])  # do nothing
+        np.array([    0,   0,  0.3]), # break right
+        np.array([    0,   0,    0])  # do nothing
     ]
 
 class DQNAgent():
-    def __init__(self, env, memory_size, batch_size):
-        
-        self.episode_decay = 2000
-        self.total_steps = 29 # offset with starting frame start skip 
+    def __init__(self, env: gymnasium.Env, experiment: dict, log: bool):
+        """ A DQN agent for driving the Car Racing environment. 
+
+        Args:
+            env (gymnasium.Env): Car racing environment
+            experiment (dict): A set of hyper parameters used to define the agent's characteristics
+            log (bool): Whether or not to log the agent's results in WandB
+        """
         self.episode_steps = 1
         self.current_episode = 1
-        self.network_update = 20
-        self.target_update  = 2
-
-        self.epsilon = 0.1
-        self.gamma = 0.95
+        self.episode_decay: int = experiment['params']['episode_decay']
+        self.total_steps: int = experiment['params']['start_skip']
+        self.network_update: int = experiment['params']['step_update']
+        self.target_update: int  = experiment['params']['target_update']
+        self.epsilon: float = experiment['params']['epsilon']
+        self.gamma: float = experiment['params']['gamma']
+        self.lr: float = experiment['params']['learning_rate']
+        self.exp_replay = ExperienceReplay(experiment['params']['mem_len'])
+        self.batch_size = experiment['params']['batch_size']
+        self.seed = experiment['params']['random_seed']
+        self.env = env
+        self.action_space = ACTION_SPACE
         
-        self.exp_replay = ExperienceReplay(memory_size)
-        self._batch_size = batch_size
-
-        self.env = env   # experience replay parameters
-        
-        self.action_space = action_space
-        
+        # Set up net (for training), target net (for stability), and best net (for testing)
         self.q_net = QNetwork(action_space=len(self.action_space))
         self.target_net = QNetwork(action_space=len(self.action_space))
         self.target_net.load_state_dict(self.q_net.state_dict())
         self.target_net.eval()    
-
+        self.best_net = QNetwork(action_space=len(self.action_space))
+        self.best_net.load_state_dict(self.q_net.state_dict())
+        self.best_net.eval()    
         self.device = self.q_net.device
-        self.optim = torch.optim.AdamW(params=self.q_net.parameters(), lr=0.0005)
+        self.optim = torch.optim.AdamW(params=self.q_net.parameters(), lr=self.lr)
         self.loss_fn = torch.nn.MSELoss()
 
-        self.rets = []
-        self.epi_qs = []
-        self.epi_losses = []
-        self.epi_selected_actions = [0 for _ in range(len(self.action_space))]
-        self.epi_start = time.time()
-        self.wb = WandBLogger()
-
-    def __call__(self, s0, a0, r0, s1, t): 
-
-        self.rets.append(r0)
+        # Logging related 
+        self.logger = WandBLogger(experiment) if log else None
+        self.max_tiles = 0
         
-        # store environment interactions into the experience buffer
-        # print("Object Call:", s0.shape, a0, r0, s1.shape, t)
+        return 
+        
+
+    def __call__(self, s0: torch.Tensor, a0: int, r0: float, s1: torch.Tensor, t: bool)->int:
+        """ Given the required information for an experience, take the necessary steps to train the agent. 
+        
+        1. Store the new experience
+        2. Train the model
+        3. Select the next action you should take
+        4. Reduce exploration via epsilon decay
+
+        Args:
+            s0 (torch.Tensor): The previous observation
+            a0 (int): The action taken to transition from the previous observation to new observation
+            r0 (float): The reward for the given action 
+            s1 (torch.Tensor): The observation seen as a result of the action 
+            t (bool): Was a terminal state reached. 
+
+        Returns:
+            int: What is the next action we should take, given our epsilon greedy strategy?
+        """
         self.exp_replay.storeExperience(s0, a0, r0, s1, t)
-
-        epsilon = self._epsilonDecay()
-
-        # select a next action with an epsilon greedy strategy
-        next_action = self._selectAction(epsilon)
         
         if self.total_steps % self.network_update == 0:
 
-            experiences = self.exp_replay.getRandomExperiences(self._batch_size)
-            
+            experiences = self.exp_replay.getRandomExperiences(self.batch_size)
             targets, actions, states = self._prepareMinibatch(experiences) 
             
-            # q_pred = torch.amax(self.q_net(states), dim=1)
-            # breakpoint()
-            rows = torch.arange(self._batch_size).to(self.device)
+            rows = torch.arange(self.batch_size).to(self.device)
             q_pred = self.q_net(states)[rows, actions]
             
             losses = self.loss_fn(targets, q_pred)
             
-            self.epi_qs.append(q_pred.detach().cpu().numpy().mean())
-            self.epi_losses.append(losses.item())
+            if self.logger:
+                self.logger.trackStatistic("q_values", q_pred.detach().cpu().numpy().mean())
+                self.logger.trackStatistic("losses", losses.item())
+                self.logger.trackStatistic("returns", r0)
 
             self.optim.zero_grad()
             losses.backward()
@@ -103,136 +139,160 @@ class DQNAgent():
             gc.collect()
             torch.cuda.empty_cache()
         
-        
-        self._trackProgress(t, epsilon) 
+        next_action = self.selectAction()
+        self._epsilonDecay()
+        self._trackProgress(t) 
         
         return next_action
 
     
     def fillMemory(self):
-
-        s0, _ = self.env.reset(seed=1)
+        """ A helper function to assist the agent by filling its memory before the first
+        episode with random actions. 
+        """
+        s0, _ = self.env.reset(seed=self.seed)
 
         step, a0 = 0, 0
-        while len(self.exp_replay) < self._batch_size:
+        while len(self.exp_replay) < self.batch_size:
             
             step += 1
-            
             s1, r0, ter, trunc, _ = self.env.step(self.action_space[a0])
-            
             if step < 30:
                 continue
             
-            a0 = random.randint(0, len(self.action_space)-1)#self.env.action_space.sample()
-                            
-            self.epi_selected_actions[a0] += 1
-            
-            # print("Fill Mem:", s0.shape, a0, r0, s1.shape, ter or trunc)
+            a0 = random.randrange(0, len(self.action_space))
             self.exp_replay.storeExperience(s0, a0, r0, s1, ter or trunc)
         
-        self.env.reset(seed=1)
+        self.env.reset(seed=self.seed)
 
         return
+    
 
-    def _prepareMinibatch(self, experiences):
+    def _prepareMinibatch(self, experiences: List[NamedTuple]):
+        """ Given some experiences, generate a minibatch from them. 
         
+        For states and actions, this means loading extraction from the experience and loading 
+        to the device. 
+        
+        Targets must be passed through the target function. 
+
+        Args:
+            experiences (List[namedtuple]): Includes entries from 
+                ["state", "action", "reward", "next_state", "terminal"]
+
+        Returns:
+            tuple: a return of targets, actions, and states
+        """
         targets = torch.stack([self.yj(memory.terminal, memory.reward, memory.next_state)
-                            for memory in experiences], dim=0).squeeze()#.to(self.device)
+                            for memory in experiences], dim=0).squeeze()
         
         states  = torch.stack([memory.state for memory in experiences], dim=0).to(self.device)
         actions  = torch.tensor(np.array([memory.action for memory in experiences])).to(self.device)
 
         return targets, actions, states
     
-    def yj(self, tj, rj, sj):
+    
+    def yj(self, tj: bool, rj: float, sj: torch.Tensor)->torch.Tensor:
+        """ 
+        Compute y_j as described in https://arxiv.org/pdf/1312.5602, using the Bellman Equation. 
+        If the state is terminal (t_j), then no future rewards can exist, so just return the future reward. 
         
-        # breakpoint()
+        Otherwise, we must use the Bellman Equation to find the discounted future reward that would be taken
+        if you took the best possible action. 
+
+        Args:
+            tj (bool): Is the state terminal
+            rj (float): Current reward for the experience
+            sj (torch.Tensor): The current state for which the reward was observerd. 
+
+        Returns:
+            torch.Tensor: The Q value for the given experience context
+        """
         if tj:
-            return torch.tensor(rj).to(self.device)
+            return torch.tensor(rj)
         else:
-            # return (rj.to(self.device) + self.gamma * self.q_net(sj.unsqueeze(0).to(self.device))).squeeze()
             with torch.no_grad():
                 Qs = self.target_net(sj.unsqueeze(0).to(self.device)).squeeze().cpu().numpy()
                 
-            # breakpoint()
-                
-            return torch.tensor(rj + self.gamma * np.max(Qs)).float().to(self.device)
+            return torch.tensor(rj + self.gamma * np.max(Qs)).float()
 
-    def _epsilonDecay(self):
-        return max((self.episode_decay - self.current_episode) / self.episode_decay, self.epsilon)
 
-    def _selectAction(self, epsilon):
+    def _epsilonDecay(self)->None:
+        """ Linearlly anneal the towards the target epsilon over self.episode_decay episodes. 
+        """
+        self.epsilon = max((self.episode_decay - self.current_episode) / self.episode_decay, self.epsilon)
+        return
+
+
+    def selectAction(self, state: Optional[torch.Tensor]=None)->int:
+        """ 
+        Select an action. If the state is not provided already, implement an 
+        epsilon greedy strategy on the most recent state on the replay buffer. 
+
+        Args:
+            state (Optional[torch.Tensor], optional): A given state to 
+            run the best policy on. Defaults to None.
+
+        Returns:
+            int: The chosen action
+        """
+        
+        if type(state) == torch.Tensor: 
+            action = self.q_net(state.unsqueeze(0).to(self.device))
+            return torch.argmax(action).detach().cpu().int().numpy()
         
         P = random.random()
-        if P > epsilon:
+        if P > self.epsilon:
             with torch.no_grad(): 
                 state = self.exp_replay.getCurrentExperience().state
                 action = self.q_net(state.unsqueeze(0).to(self.device))
-                # print(P, self.episode_steps, torch.argmax(action).detach().cpu().int().numpy(), action)
                 action = torch.argmax(action).detach().cpu().int().numpy()
-                # action = self._clipAction(action).squeeze().detach()
         else:
-            # action = torch.tensor(self.env.action_space.sample()).int()
-            action = random.randint(0, len(self.action_space)-1)
-            
-
-        self.epi_selected_actions[action] += 1
+            action = random.randrange(0, len(self.action_space))
 
         return action
-    
 
-    def _clipAction(self, action):
-        return torch.clip(action,
-                            torch.tensor(self.env.action_space.low).to(self.device),
-                            torch.tensor(self.env.action_space.high).to(self.device))
-    
 
-    def _trackProgress(self, episode_end, epsilon):
+    def _trackProgress(self, episode_end:bool)->None:
+        """ Implement some 'catch all' logic to interface with the wandb logger. 
 
+        Args:
+            episode_end (bool): Some statistics should not be sent unless the episode is over, 
+            use this as a flag for that. 
+        """
         if episode_end:
-
-            if self.current_episode > 1:
-
-                stats = {
-                    "eps": epsilon,
-                    "epi_tot_rets": sum(self.rets),
-                    "epi_avg_rets": sum(self.rets)/len(self.rets),
-                    "epi_dur_seconds": round(time.time() - self.epi_start, 2),
-                    "tot_steps": self.total_steps,
-                    "epi_avg_q": sum(self.epi_qs)/len(self.epi_qs),
-                    "epi_avg_loss": sum(self.epi_losses)/len(self.epi_losses),
-                    "tiles_visited": self.env.unwrapped.tile_visited_count,
-                    "percent_do_nothing": self.epi_selected_actions[-1]/sum(self.epi_selected_actions) * 100
-                }
-
-                print(f"Episode Times: {stats['epi_dur_seconds']}")
-                self.wb.send_log(stats)
-
-            print(f"Steps in Episode: {self.episode_steps}")
-            print(f"Actions in Episode: {self.epi_selected_actions}")
-            print(f"Tiles Visited: {self.env.unwrapped.tile_visited_count}")
             
-            self.current_episode += 1 
-            self.episode_steps = 29
+            if self.current_episode > 1 and self.logger:
 
-            self.epi_start = time.time()
-            self.rets = []
-            self.epi_selected_actions = [0 for _ in range(len(self.action_space))]
+                self.logger.setStatistic("epi_avg_q", self.logger.averageStatistic("q_values"))
+                self.logger.setStatistic("epi_avg_rets", self.logger.averageStatistic("returns"))
+                self.logger.setStatistic("epi_avg_loss", self.logger.averageStatistic("losses"))
+                self.logger.setStatistic("tiles_visited", self.env.unwrapped.tile_visited_count)
+
+                self.logger.trackStatistic("returns")            
+                self.logger.trackStatistic("q_values")            
+                self.logger.trackStatistic("losses")            
 
             if self.current_episode % self.target_update == 0:
                 self.target_net.load_state_dict(self.q_net.state_dict())
-                                                             
-        self.total_steps += 1
-        self.episode_steps += 1
+
+        if self.logger:
+            self.logger.setStatistic("total_steps", step=True)
+            self.logger.setStatistic("eps", self.epsilon)
+        self.current_episode += 1
 
         if self.total_steps % 1000 == 0 and self.exp_replay.memory_capacity < 100:
             print(f"Memory Capacity: {self.exp_replay.memory_capacity:.2f}%")
+        
+        if self.env.unwrapped.tile_visited_count > self.max_tiles:
+            self.env.unwrapped.tile_visited_count = self.max_tiles
+            self.best_net.load_state_dict(self.q_net.state_dict())
 
         return
         
 
 class QNetwork(torch.nn.Module):
-    def __init__(self, action_space):
+    def __init__(self, action_space: int):
         super().__init__()
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -242,7 +302,6 @@ class QNetwork(torch.nn.Module):
             torch.nn.Conv2d(in_channels=16, out_channels=32, kernel_size=4, stride=2),
             torch.nn.ReLU(),
             torch.nn.Flatten(),
-            # torch.nn.Linear(in_features=3200, out_features=256),
             torch.nn.Linear(in_features=2592, out_features=256),
             torch.nn.ReLU(),
             torch.nn.Linear(in_features=256, out_features=128),
@@ -258,13 +317,31 @@ class QNetwork(torch.nn.Module):
 
 class ExperienceReplay():
     def __init__(self, memory_length):
+        """ A memory object for an RL agent. 
+        
+        The basis for the Bellman Equation is that observations are independent of each other. 
+        In many of the gymnasium settings, this assumption does not hold. To help get closer to this assumption, we can 
+        pulling randomly from a set of memories to reduce their correlation. 
 
+        Args:
+            memory_length (int): size of the memory
+        """
         self.Experience = namedtuple("Experience", ["state", "action", "reward", "next_state", "terminal"])
         self._replay_memory = deque(maxlen=memory_length)
         self.memory_length = memory_length
 
-    def storeExperience(self, s0, a0, r0, s1, t):
 
+    def storeExperience(self, s0: torch.Tensor, a0: int, r0: float, s1: torch.Tensor, t: bool)->None:
+        """ Store an experience of the agent. If the memory is full, throw away the oldest one. 
+
+        Args:
+            s0 (torch.Tensor): The previous observation
+            a0 (int): The action taken to transition from the previous observation to new observation
+            r0 (float): The reward for the given action 
+            s1 (torch.Tensor): The observation seen as a result of the action 
+            t (bool): Was a terminal state reached. 
+
+        """
         if len(self._replay_memory) == self._replay_memory.maxlen:
             self._replay_memory.popleft()
 
@@ -274,20 +351,20 @@ class ExperienceReplay():
         self.memory_capacity = len(self._replay_memory) / self.memory_length * 100
 
         return
+    
 
-    def getRandomExperiences(self, batch_size):
-        # return random.sample(self._replay_memory, k=batch_size)
-        
-        # weights = np.linspace(start=0.1, stop=1.0, num=len(self._replay_memory)) 
-        # weights /= weights.sum()
-        
-        # sampled_indices = np.random.choice(np.arange(len(self._replay_memory)), size=batch_size, p=weights, replace=False)
+    def getRandomExperiences(self, batch_size: int)->List[NamedTuple]:
+        """Return a list of experiences. May be a good idea to do some prioritzed memory buffer here. 
 
-        # batch = [self._replay_memory[idx] for idx in sampled_indices]
-        # return batch
-        
-        return random.choices(self._replay_memory, weights=[i+1 for i in range(len(self._replay_memory))], k=batch_size)
-        # return random.choices(self._replay_memory, weights=[i + exp.reward*3 for i, exp in enumerate(self._replay_memory)], k=batch_size)
+        Args:
+            batch_size (int): Length of lists to return
+
+        Returns:
+            List[NamedTuple]: List of memories. 
+        """
+        return random.choices(self._replay_memory, 
+                            weights=[i+1 for i in range(len(self._replay_memory))], 
+                            k=batch_size)
     
     def getCurrentExperience(self):
         return self._replay_memory[-1]

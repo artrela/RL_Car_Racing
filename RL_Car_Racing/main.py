@@ -1,117 +1,148 @@
+# ==============================================================================
+# Created by: Alec Trela
+# GitHub: https://github.com/artrela
+# Description: The main training and evaluation protocol for the training RL agents
+# on Gymnasium (formerly OpenAI Gym)
+#
+# This is included as a part of the MRSD bootcamp, meant to be a primer for students
+# entering their first year of the program at Carnegie Mellon University 
+# 
+# Feel free to use, modify, and share this file. Attribution is appreciated! 
+# For more information, visit my GitHub or 
+# https://github.com/RoboticsKnowledgebase/mrsd-software-bootcamp.
+# ==============================================================================
+
+import argparse
 import gymnasium as gym
+
+import utils
 from models.dqn import DQNAgent
-from gymnasium.wrappers import GrayscaleObservation, FrameStackObservation, \
-                            TransformObservation, ClipAction, numpy_to_torch, RecordVideo
-import torch
-import numpy as np
-from scipy.spatial import KDTree
-import math
 
-NUM_EPISODES = int(5000)
-MEM_LEN = int(1e5)
-SEED = 1
-BATCH_SIZE = 64
-np.random.seed(1)
 
-'''
-Todo:
-Write an evaluation function that tracks the target/best network over time
-'''
+def main(experiment: dict, debug: bool)->None:
+    """
+    Train an RL agent to drive in the Gymnasium environment 'CarRacing-v3', using hyperparameters specified in a 
+    configuration yaml file. See 'RL_Car_Racing/config/default.yaml' as a starting point.
 
-def train(config: str):
+    Args:
+        experiment (dict): A set of parameters to define the experiement. High level markers are 'params' and 
+        'name'. 
+        debug (bool): Forgoes wandb logging for debugging purposes 
+    """
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     env = gym.make("CarRacing-v3", render_mode='rgb_array', domain_randomize=False, continuous=True)
-    env = GrayscaleObservation(env, keep_dim=False) #True)
-    env = FrameStackObservation(env, stack_size=4)
-    env = TransformObservation(env, lambda x: torch.tensor(x).float(), env.observation_space)
-    # env = numpy_to_torch.NumpyToTorch(env, device='cpu')
-    # env = TransformObservation(env, lambda x: torch.tensor(x).to('cpu'), env.observation_space)
-    # env = TransformObservation(env, lambda x: torch.permute(x, (2, 0, 1)).float(), env.observation_space)
-    env = TransformObservation(env, lambda x: x[:, :84, :84], env.observation_space)
-    env = RecordVideo(env, video_folder="./videos/deeper-net-3", episode_trigger=lambda t: t % 50 == 0, 
-                    disable_logger=True)
-
-
-    agent = DQNAgent(env, memory_size=MEM_LEN, batch_size=BATCH_SIZE)
-    print("Using device:", device)
-
-    agent.fillMemory()
-    import matplotlib.pyplot as plt
+    env = utils.wrap_env(env, experiment['name'], record_t=experiment['record_train'])
     
-    # _ = env.reset(seed=SEED)
-    # track_pts = np.array([[pt[-2], pt[-1]] for pt in env.unwrapped.track])
-    # track_tree = KDTree(track_pts)
+    test_env = gym.make("CarRacing-v3", render_mode='rgb_array', domain_randomize=False, continuous=True)
+    test_env = utils.wrap_env(test_env, experiment['name'], record_t=1)
 
-    # skip_frame = 2
-    action = -1 #env.action_space.sample()
-    # action = torch.tensor(action)
+    agent = DQNAgent(env, experiment, log=False if debug else True)
+    
+    for e in range(experiment['params']['num_episodes']):
 
-    for e in range(NUM_EPISODES):
-
-        print("Starting episode:", e+1, "/", NUM_EPISODES)
-        prev_observation, info = env.reset(seed=SEED)
-        action = -1
-
-        terminated = truncated = False
-        consec_neg = 0
-        step = 0
-        while not (terminated or truncated):
-            step += 1
-            observation, reward, terminated, truncated, info = env.step(agent.action_space[action])
+        start_str = 15*"=" + f"Episode {e+1}/{experiment['params']['num_episodes']} Start" + 15*"="
+        print(start_str)
+        
+        train(agent, env, 
+                start_skip=experiment['params']['start_skip'],
+                stacked_neg=experiment['params']['stacked_neg'])
+                    
+        if e % experiment['evaluation_step'] == 0:
+            eval(agent, test_env, experiment['params']['start_skip'])
+        
+        if agent.logger:
+            agent.logger.sendLog()
             
-            # for _ in range(skip_frame):
-            #     _, r, terminated, truncated, info = env.step(agent.action_space[action])
-            #     reward += r
-                        
-            if step < 30:
-                continue
-            
-            # if action == 0:
-            #     reward += 0.1
-
-            if reward < 0:
-                consec_neg += 1
-                reward = 0
-            if reward > 0:
-                consec_neg = 0
-            
-            if consec_neg > 60:
-                truncated = True
-                info["Continuous Negatives"] = True
-            
-            # print("Car Position:", env.unwrapped.car.hull.position)
-            # print("Closest Track Point:", track_tree.query(np.array(env.unwrapped.car.hull.position))
-            # # if track_tree.query(np.array(env.unwrapped.car.hull.position))[0] > 40/3:
-            # if track_tree.query(np.array(env.unwrapped.car.hull.position))[0] > 6.6*4:
-            #     truncated = True
-            #     info["Too Far From Track"] = True
-            
-            # if consec_neg > 60:
-            #     reward -= (consec_neg - 60)
-                
-            # if track_tree.query(np.array(env.unwrapped.car.hull.position))[0] > 6.6*2:
-            #     reward = -0.1
-                
-            # reward = max(reward, -100)
-            
-            action = agent(prev_observation, action, reward, observation, terminated or truncated)
-                                    
-            if terminated or truncated:
-                print("Finished Lap:", info)
-                # fig, ax = plt.subplots(2, 2)
-                # plt.title("Step" + str(step))
-                # ax.imshow(observation.squeeze(), cmap='gray')
-                # for idx, a in enumerate(ax.ravel()):
-                    # a.imshow(observation[idx], cmap='gray')
-                # plt.show()
-                
-                print(15*"=", "Episode End", 15*"=")
-                continue
-
-            prev_observation = observation.detach().clone()
+        print("=" * len(start_str), "\n")
 
     env.close()
+    test_env.close()
+    
+
+def train(agent: DQNAgent, env: gym.Env, start_skip: int, stacked_neg: int)->None:
+    """ Train the agent, which may include steps not seen during evaluatoin
+    
+    Args:
+        agent (DQNAgent): The RL agent
+        env (gym.Env): The train environment
+        start_skip (int): To skip frames at the beginning of the episode
+        stack_neg (int): The amount of allowable negative rewards in a row before the
+            environment resets. 
+    """
+    prev_observation, info = env.reset(seed=experiment['params']['random_seed'])
+    terminated = truncated = False
+    
+    action, consec_neg, step = -1, 0, 0
+    while not (terminated or truncated):
+        step += 1
+        observation, reward, terminated, truncated, info = env.step(agent.action_space[action])
+        if step < start_skip:
+            continue
+        
+        if reward < 0:
+            consec_neg += 1
+            reward = 0
+        else:
+            consec_neg = 0
+        
+        if consec_neg > stacked_neg:
+            truncated = True
+            info["Continuous Negatives"] = True
+        
+        action = agent(prev_observation, action, reward, observation, terminated or truncated)
+                                
+        if terminated or truncated:
+            print("[TRAIN] | Info:", info)
+            print("[TRAIN] | Steps:", step - start_skip)
+            print("[TRAIN] | Tiles Visited:", env.unwrapped.tile_visited_count)
+            continue
+
+        prev_observation = observation.detach().clone()
+        
+
+def eval(agent: DQNAgent, env: gym.Env, start_skip: int)->None:
+    """ Evaluate the agent, using the agent that has amassed the highest training tiles during training,
+    with no exploration. 
+
+    Args:
+        agent (DQNAgent): The trained RL agent
+        env (gym.Env): The test environment
+        start_skip (int): To skip frames at the beginning of the episode
+    """
+    
+    env.reset(seed=experiment['params']['random_seed'])
+    terminated = truncated = False
+    
+    action, step = -1, 0
+    while not (terminated or truncated):
+        
+        step += 1
+        observation, reward, terminated, truncated, info = env.step(agent.action_space[action])
+        if step < start_skip:
+            continue
+        
+        action = agent.selectAction(state=observation)
+        
+        if agent.logger:
+            agent.logger.setStatistic('test_tiles', env.unwrapped.tile_visited_count)
+                                
+        if terminated or truncated:
+            print("[EVAL] | Info:", info)
+            print("[EVAL] | Tiles Visited:", env.unwrapped.tile_visited_count)
+            return
+
 
 if __name__ == "__main__":
-    train("")
+    
+    parser = argparse.ArgumentParser(description="Running training cycle for RL agent on Car Racing Gymnasium Environment")
+    
+    parser.add_argument("--config", "-c", default="./RL_Car_Racing/config/default.yaml", type=str,
+                    help="Path to yaml file used to establish an experiment.")
+    parser.add_argument("--debug", "-d", 
+                        help="Removes wandb logging for debugging purposes.", action="store_true")
+    
+    args = parser.parse_args()  
+    
+    experiment: dict = utils.parse_config(args.config)
+    
+    main(experiment, args.debug)
