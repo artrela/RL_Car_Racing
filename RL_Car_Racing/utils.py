@@ -31,7 +31,7 @@ class WandBLogger:
         """
         self.stats: Dict[str, float] = {
                     "eps": 0.,
-                    "total_steps": 0.,
+                    "tot_steps": 0.,
                     "epi_avg_rets": 0.,
                     "epi_avg_q": 0.,
                     "epi_avg_loss": 0.,
@@ -50,7 +50,7 @@ class WandBLogger:
                         config = experiment['params'])
         
         
-    def setStatistic(self, name: str, val: float=1, step: bool=True)->None:
+    def setStatistic(self, name: str, val: float=1, step: bool=False)->None:
         """ For the statistics given in the __init__ function, which will be send to 
         WandB logs at a self.sendLog() call, update the value. 
 
@@ -65,7 +65,7 @@ class WandBLogger:
             stats are tracked
         """
         if name not in self.stats.keys():
-            raise KeyError(f"{name} not in statistics tracker! Valid options are {self.stats.keys()}")
+            raise KeyError(f" '{name}' not in statistics tracker! Valid options are {self.stats.keys()}")
         else:
             if step:
                 self.stats[name] += val
@@ -87,13 +87,19 @@ class WandBLogger:
             KeyError: If the statistic is not existing, then throw and error showing which
             stats are tracked
         """
-        if name not in self.stats.keys():
-            raise KeyError(f"{name} not in statistics tracker! Valid options are {self.stats.keys()}")
+        if name not in self.epi_stats.keys():
+            raise KeyError(f" '{name}' not in episode statistics tracker! Valid options are {self.stats.keys()}")
         else:
             if type(val) == float:
                 self.epi_stats[name].append(val)
             elif type(val) == list:
                 self.epi_stats[name] = val
+            else:
+                try: 
+                    val = float(val)
+                    self.epi_stats[name].append(val)
+                except:
+                    raise NotImplementedError(f"No handling for type {type(val)} exists")
             
         return
     
@@ -110,8 +116,8 @@ class WandBLogger:
         Returns:
             float: return the average of the statistic
         """
-        if name not in self.stats.keys():
-            raise KeyError(f"{name} not in statistics tracker! Valid options are {self.stats.keys()}")
+        if name not in self.epi_stats.keys():
+            raise KeyError(f" '{name}' not in episode statistics tracker! Valid options are {self.stats.keys()}")
         else:
             return sum(self.epi_stats[name]) / len(self.epi_stats[name])
             

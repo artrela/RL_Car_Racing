@@ -63,12 +63,13 @@ class DQNAgent():
             log (bool): Whether or not to log the agent's results in WandB
         """
         self.episode_steps = 1
-        self.current_episode = 1
+        self.current_episode = 0
         self.episode_decay: int = experiment['params']['episode_decay']
         self.total_steps: int = experiment['params']['start_skip']
         self.network_update: int = experiment['params']['step_update']
         self.target_update: int  = experiment['params']['target_update']
-        self.epsilon: float = experiment['params']['epsilon']
+        self.epsilon_final: float = experiment['params']['epsilon']
+        self.epsilon: float = 1.
         self.gamma: float = experiment['params']['gamma']
         self.lr: float = experiment['params']['learning_rate']
         self.exp_replay = ExperienceReplay(experiment['params']['mem_len'])
@@ -184,7 +185,7 @@ class DQNAgent():
             tuple: a return of targets, actions, and states
         """
         targets = torch.stack([self.yj(memory.terminal, memory.reward, memory.next_state)
-                            for memory in experiences], dim=0).squeeze()
+                            for memory in experiences], dim=0).squeeze().to(self.device)
         
         states  = torch.stack([memory.state for memory in experiences], dim=0).to(self.device)
         actions  = torch.tensor(np.array([memory.action for memory in experiences])).to(self.device)
@@ -220,7 +221,7 @@ class DQNAgent():
     def _epsilonDecay(self)->None:
         """ Linearlly anneal the towards the target epsilon over self.episode_decay episodes. 
         """
-        self.epsilon = max((self.episode_decay - self.current_episode) / self.episode_decay, self.epsilon)
+        self.epsilon = max((self.episode_decay - self.current_episode) / self.episode_decay, self.epsilon_final)
         return
 
 
@@ -249,7 +250,7 @@ class DQNAgent():
                 action = torch.argmax(action).detach().cpu().int().numpy()
         else:
             action = random.randrange(0, len(self.action_space))
-
+            
         return action
 
 
@@ -261,9 +262,9 @@ class DQNAgent():
             use this as a flag for that. 
         """
         if episode_end:
+            self.current_episode += 1
             
-            if self.current_episode > 1 and self.logger:
-
+            if self.current_episode > 0 and self.logger:
                 self.logger.setStatistic("epi_avg_q", self.logger.averageStatistic("q_values"))
                 self.logger.setStatistic("epi_avg_rets", self.logger.averageStatistic("returns"))
                 self.logger.setStatistic("epi_avg_loss", self.logger.averageStatistic("losses"))
@@ -271,19 +272,17 @@ class DQNAgent():
 
                 self.logger.trackStatistic("returns")            
                 self.logger.trackStatistic("q_values")            
-                self.logger.trackStatistic("losses")            
-
+                self.logger.trackStatistic("losses")    
+                
             if self.current_episode % self.target_update == 0:
                 self.target_net.load_state_dict(self.q_net.state_dict())
 
-        if self.logger:
-            self.logger.setStatistic("total_steps", step=True)
-            self.logger.setStatistic("eps", self.epsilon)
-        self.current_episode += 1
-
-        if self.total_steps % 1000 == 0 and self.exp_replay.memory_capacity < 100:
-            print(f"Memory Capacity: {self.exp_replay.memory_capacity:.2f}%")
+        self.total_steps += 1
         
+        if self.logger:
+            self.logger.setStatistic("tot_steps", step=True)
+            self.logger.setStatistic("eps", self.epsilon)
+
         if self.env.unwrapped.tile_visited_count > self.max_tiles:
             self.env.unwrapped.tile_visited_count = self.max_tiles
             self.best_net.load_state_dict(self.q_net.state_dict())
@@ -348,8 +347,6 @@ class ExperienceReplay():
         new_experience = self.Experience(s0, a0, r0, s1, t)
         self._replay_memory.append(new_experience)
         
-        self.memory_capacity = len(self._replay_memory) / self.memory_length * 100
-
         return
     
 
@@ -368,6 +365,12 @@ class ExperienceReplay():
     
     def getCurrentExperience(self):
         return self._replay_memory[-1]
+    
+    def getCapacity(self):
+        return len(self._replay_memory) / self.memory_length * 100
+    
+    def isFull(self):
+        return len(self._replay_memory) == self.memory_length
 
     def __len__(self):
         return len(self._replay_memory)
