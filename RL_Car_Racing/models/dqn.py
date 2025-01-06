@@ -16,26 +16,28 @@ from utils import WandBLogger
 # 1: gas [0, 1]
 # 2: braking [0, 1]
 action_space = [
-        np.array([   0,   1,   0]), # all gas, no break
-        np.array([  -1,   1,   0]), # hard left
-        np.array([   1,   1,   0]), # hard right
-        np.array([-0.5,   1,   0]), # soft left
-        np.array([ 0.5,   1,   0]), # soft right
-        np.array([   1,   1, 0.3]), # drift left
-        np.array([  -1,   1, 0.3]), # drift right
-        np.array([   1,   0, 0.3]), # break left
-        np.array([  -1,   0, 0.3]), # break right
-        np.array([   0,   0,   0])  # do nothing
+        np.array([    0,   1,   0]), # all gas, no break
+        np.array([    0,   0.8,   0]), # all gas, no break
+        np.array([   -1,   0,   0]), # hard left
+        np.array([    1,   0,   0]), # hard right
+        np.array([-0.67,   0,   0]), # soft left
+        np.array([ 0.67,   0,   0]), # soft left
+        np.array([-0.33,   0,   0]), # soft right
+        np.array([ 0.33,   0,   0]), # soft right
+        np.array([    0,   0, 1.0]), # break left
+        np.array([    0,   0, 0.67]), # break left
+        np.array([    0,   0, 0.3]), # break right
+        np.array([    0,   0,   0])  # do nothing
     ]
 
 class DQNAgent():
     def __init__(self, env, memory_size, batch_size):
         
-        self.episode_decay = 200
+        self.episode_decay = 2000
         self.total_steps = 29 # offset with starting frame start skip 
         self.episode_steps = 1
         self.current_episode = 1
-        self.network_update = 10
+        self.network_update = 20
         self.target_update  = 2
 
         self.epsilon = 0.1
@@ -51,6 +53,7 @@ class DQNAgent():
         self.q_net = QNetwork(action_space=len(self.action_space))
         self.target_net = QNetwork(action_space=len(self.action_space))
         self.target_net.load_state_dict(self.q_net.state_dict())
+        self.target_net.eval()    
 
         self.device = self.q_net.device
         self.optim = torch.optim.AdamW(params=self.q_net.parameters(), lr=0.0005)
@@ -61,7 +64,7 @@ class DQNAgent():
         self.epi_losses = []
         self.epi_selected_actions = [0 for _ in range(len(self.action_space))]
         self.epi_start = time.time()
-        self.wb = WandBLogger()    
+        self.wb = WandBLogger()
 
     def __call__(self, s0, a0, r0, s1, t): 
 
@@ -133,17 +136,11 @@ class DQNAgent():
 
     def _prepareMinibatch(self, experiences):
         
-        # for e in experiences:
-        # l = [self.yj(memory.terminal, memory.reward, memory.next_state)
-        #                     for memory in experiences]
-        #     print(f"{e.reward=}, {e.next_state.shape=}")
-        # breakpoint()
         targets = torch.stack([self.yj(memory.terminal, memory.reward, memory.next_state)
                             for memory in experiences], dim=0).squeeze()#.to(self.device)
         
         states  = torch.stack([memory.state for memory in experiences], dim=0).to(self.device)
         actions  = torch.tensor(np.array([memory.action for memory in experiences])).to(self.device)
-        # breakpoint()
 
         return targets, actions, states
     
@@ -224,7 +221,7 @@ class DQNAgent():
 
             if self.current_episode % self.target_update == 0:
                 self.target_net.load_state_dict(self.q_net.state_dict())
-        
+                                                             
         self.total_steps += 1
         self.episode_steps += 1
 
@@ -248,7 +245,11 @@ class QNetwork(torch.nn.Module):
             # torch.nn.Linear(in_features=3200, out_features=256),
             torch.nn.Linear(in_features=2592, out_features=256),
             torch.nn.ReLU(),
-            torch.nn.Linear(in_features=256, out_features=action_space)
+            torch.nn.Linear(in_features=256, out_features=128),
+            torch.nn.ReLU(),
+            torch.nn.Linear(in_features=128, out_features=64),
+            torch.nn.ReLU(),
+            torch.nn.Linear(in_features=64, out_features=action_space)
         ]).to(self.device)
 
     def forward(self, x):
@@ -275,7 +276,18 @@ class ExperienceReplay():
         return
 
     def getRandomExperiences(self, batch_size):
-        return random.sample(self._replay_memory, k=batch_size)
+        # return random.sample(self._replay_memory, k=batch_size)
+        
+        # weights = np.linspace(start=0.1, stop=1.0, num=len(self._replay_memory)) 
+        # weights /= weights.sum()
+        
+        # sampled_indices = np.random.choice(np.arange(len(self._replay_memory)), size=batch_size, p=weights, replace=False)
+
+        # batch = [self._replay_memory[idx] for idx in sampled_indices]
+        # return batch
+        
+        return random.choices(self._replay_memory, weights=[i+1 for i in range(len(self._replay_memory))], k=batch_size)
+        # return random.choices(self._replay_memory, weights=[i + exp.reward*3 for i, exp in enumerate(self._replay_memory)], k=batch_size)
     
     def getCurrentExperience(self):
         return self._replay_memory[-1]
