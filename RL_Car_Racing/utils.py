@@ -14,7 +14,7 @@
 
 import gymnasium as gym
 import os, torch, wandb, yaml
-from typing import Dict, List
+from typing import Dict, Optional
 
 
 class WandBLogger:
@@ -36,7 +36,7 @@ class WandBLogger:
                     "epi_avg_q": 0.,
                     "epi_avg_loss": 0.,
                     "tiles_visited": 0.,
-                    "test_tiles": 0.
+                    "eval_tiles_visited": 0.
         }
         self.epi_stats: Dict[str, list] = {
                     "returns": [],
@@ -74,7 +74,7 @@ class WandBLogger:
         return
     
     
-    def trackStatistic(self, name: str, val: float | list = [])->None:
+    def trackStatistic(self, name: str, val: Optional[float]=None)->None:
         """Meant to track statistics that occur over an episode run. 
 
         Args:
@@ -90,16 +90,14 @@ class WandBLogger:
         if name not in self.epi_stats.keys():
             raise KeyError(f" '{name}' not in episode statistics tracker! Valid options are {self.stats.keys()}")
         else:
-            if type(val) == float:
-                self.epi_stats[name].append(val)
-            elif type(val) == list:
-                self.epi_stats[name] = val
-            else:
+            if val is not None: 
                 try: 
                     val = float(val)
                     self.epi_stats[name].append(val)
                 except:
                     raise NotImplementedError(f"No handling for type {type(val)} exists")
+            else:
+                self.epi_stats[name].clear()
             
         return
     
@@ -120,6 +118,24 @@ class WandBLogger:
             raise KeyError(f" '{name}' not in episode statistics tracker! Valid options are {self.stats.keys()}")
         else:
             return sum(self.epi_stats[name]) / len(self.epi_stats[name])
+        
+    def sumStatistic(self, name: str)->float:
+        """Calculate the sum of a given statistic being tracked over an episode. 
+
+        Args:
+            name (str): The key to obtain the average for in the *episode* statistics tracker
+
+        Raises:
+            KeyError:  If the statistic is not existing, then throw and error showing which
+            stats are tracked
+
+        Returns:
+            float: return the sum of the statistic
+        """
+        if name not in self.epi_stats.keys():
+            raise KeyError(f" '{name}' not in episode statistics tracker! Valid options are {self.stats.keys()}")
+        else:
+            return sum(self.epi_stats[name])
             
             
     def sendLog(self)->None:

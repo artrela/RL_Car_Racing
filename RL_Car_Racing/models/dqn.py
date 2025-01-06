@@ -265,8 +265,10 @@ class DQNAgent():
             self.current_episode += 1
             
             if self.current_episode > 0 and self.logger:
+                
                 self.logger.setStatistic("epi_avg_q", self.logger.averageStatistic("q_values"))
                 self.logger.setStatistic("epi_avg_rets", self.logger.averageStatistic("returns"))
+                self.logger.setStatistic("epi_tot_rets", self.logger.sumStatistic("returns"))
                 self.logger.setStatistic("epi_avg_loss", self.logger.averageStatistic("losses"))
                 self.logger.setStatistic("tiles_visited", self.env.unwrapped.tile_visited_count)
 

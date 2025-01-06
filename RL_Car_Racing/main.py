@@ -18,6 +18,8 @@ import gymnasium as gym
 import utils
 from models.dqn import DQNAgent
 
+from pprint import pprint
+
 
 def main(experiment: dict, debug: bool)->None:
     """
@@ -50,6 +52,8 @@ def main(experiment: dict, debug: bool)->None:
         if e % experiment['evaluation_step'] == 0:
             eval(agent, test_env, experiment['params']['start_skip'])
         
+        pprint(agent.logger.stats)
+        
         if agent.logger:
             agent.logger.sendLog()
             
@@ -74,6 +78,7 @@ def train(agent: DQNAgent, env: gym.Env, start_skip: int, stacked_neg: int)->Non
     
     action, consec_neg, step = -1, 0, 0
     while not (terminated or truncated):
+        
         step += 1
         observation, reward, terminated, truncated, info = env.step(agent.action_space[action])
         if step < start_skip:
@@ -124,7 +129,7 @@ def eval(agent: DQNAgent, env: gym.Env, start_skip: int)->None:
         action = agent.selectAction(state=observation)
         
         if agent.logger:
-            agent.logger.setStatistic('test_tiles', env.unwrapped.tile_visited_count)
+            agent.logger.setStatistic('eval_tiles_visited', env.unwrapped.tile_visited_count)
                                 
         if terminated or truncated:
             print("[EVAL] | Info:", info)
