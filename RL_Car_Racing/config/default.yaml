@@ -44,8 +44,7 @@
 # ==============================================================================
 
 name: 'default'
-evaluation_step: !!int 25
-record_train: !!int 50
+record_video: !!int 50
 params:
   start_skip: !!int 30
   stacked_neg: !!int 60

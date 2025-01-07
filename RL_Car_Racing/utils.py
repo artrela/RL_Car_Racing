@@ -51,7 +51,7 @@ class WandBLogger:
                         config = experiment['params'])
         
         
-    def setStatistic(self, name: str, val: float=1, step: bool=False)->None:
+    def setStatistic(self, name: str, val: float=1., step: bool=False)->None:
         """ For the statistics given in the __init__ function, which will be send to 
         WandB logs at a self.sendLog() call, update the value. 
 
@@ -191,7 +191,6 @@ def wrap_env(env: gym.Env, experiment_name: str, record_t: int=1)->gym.Env:
     env = gym.wrappers.TransformObservation(env, lambda x: torch.tensor(x).float(), env.observation_space)
     env = gym.wrappers.TransformObservation(env, lambda x: x[:, :84, :84], env.observation_space)
     # place wrapper class calls here
-    
     
     split = "train" if record_t != 1 else "eval"
     env = gym.wrappers.RecordVideo(env, video_folder=f"./videos/{experiment_name}/{split}/", episode_trigger=lambda t: t % record_t == 0, 

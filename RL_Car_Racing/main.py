@@ -31,7 +31,7 @@ def main(experiment: dict, debug: bool)->None:
     """
 
     train_env = gym.make("CarRacing-v3", render_mode='rgb_array', domain_randomize=False, continuous=True)
-    train_env = utils.wrap_env(train_env, experiment['name'], record_t=experiment['record_train'])
+    train_env = utils.wrap_env(train_env, experiment['name'], record_t=experiment['record_video'])
     
     test_env = gym.make("CarRacing-v3", render_mode='rgb_array', domain_randomize=False, continuous=True)
     test_env = utils.wrap_env(test_env, experiment['name'])
@@ -47,7 +47,7 @@ def main(experiment: dict, debug: bool)->None:
                 start_skip=experiment['params']['start_skip'],
                 stacked_neg=experiment['params']['stacked_neg'])
                     
-        if e % experiment['evaluation_step'] - 1 == 0:
+        if e % experiment['record_video'] == 0:
             eval(agent, test_env, experiment['params']['start_skip'])
         
         if agent.logger:

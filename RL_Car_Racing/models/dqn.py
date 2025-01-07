@@ -72,9 +72,9 @@ class DQNAgent():
         self.epsilon: float = 1.
         self.gamma: float = experiment['params']['gamma']
         self.lr: float = experiment['params']['learning_rate']
+        self.batch_size:int = experiment['params']['batch_size']
+        self.seed: int = experiment['params']['random_seed']
         self.exp_replay = ExperienceReplay(experiment['params']['mem_len'])
-        self.batch_size = experiment['params']['batch_size']
-        self.seed = experiment['params']['random_seed']
         self.env = env
         self.action_space = ACTION_SPACE
         self.episode_actions = [0 for _ in range(len(self.action_space))]
@@ -128,7 +128,6 @@ class DQNAgent():
             
             losses = self.loss_fn(targets, q_pred)
             
-            print("Updating:", losses.item(), q_pred.detach().cpu().numpy().mean())
             if self.logger:
                 self.logger.trackStatistic("q_values", q_pred.detach().cpu().numpy().mean())
                 self.logger.trackStatistic("losses", losses.item())
@@ -165,7 +164,7 @@ class DQNAgent():
             if step < self.start_skip:
                 continue
             
-            a0 = random.randrange(0, len(self.action_space))
+            a0 = random.randint(0, len(self.action_space)-1)
             self.exp_replay.storeExperience(s0, a0, r0, s1, ter or trunc)
         
         self.env.reset(seed=self.seed)
@@ -242,7 +241,7 @@ class DQNAgent():
             int: The chosen action
         """
         
-        if state is not None: 
+        if state is not None:
             action = self.q_net(state.unsqueeze(0).to(self.device))
             return torch.argmax(action).detach().cpu().int().item()
         
@@ -253,7 +252,7 @@ class DQNAgent():
                 action = self.q_net(state.unsqueeze(0).to(self.device))
                 action = torch.argmax(action).detach().cpu().int().item()
         else:
-            action = random.randrange(0, len(self.action_space))
+            action = random.randint(0, len(self.action_space)-1)
             
         self.episode_actions[action] += 1
             
@@ -269,7 +268,7 @@ class DQNAgent():
         """
         if episode_end:
             self.current_episode += 1
-            print("[TRAIN] | Actions Taken:", self.episode_actions)
+            # print("[TRAIN] | Actions Taken:", self.episode_actions)
             self.episode_actions = [0 for _ in range(len(self.action_space))]
             
             if self.current_episode > 0 and self.logger:
@@ -294,7 +293,7 @@ class DQNAgent():
             self.logger.setStatistic("eps", self.epsilon)
 
         if self.env.unwrapped.tile_visited_count > self.max_tiles:
-            self.env.unwrapped.tile_visited_count = self.max_tiles
+            self.max_tiles = self.env.unwrapped.tile_visited_count
             self.best_net.load_state_dict(self.q_net.state_dict())
 
         return
