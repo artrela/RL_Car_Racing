@@ -18,8 +18,6 @@ import gymnasium as gym
 import utils
 from models.dqn import DQNAgent
 
-from pprint import pprint
-
 
 def main(experiment: dict, debug: bool)->None:
     """
@@ -32,34 +30,32 @@ def main(experiment: dict, debug: bool)->None:
         debug (bool): Forgoes wandb logging for debugging purposes 
     """
 
-    env = gym.make("CarRacing-v3", render_mode='rgb_array', domain_randomize=False, continuous=True)
-    env = utils.wrap_env(env, experiment['name'], record_t=experiment['record_train'])
+    train_env = gym.make("CarRacing-v3", render_mode='rgb_array', domain_randomize=False, continuous=True)
+    train_env = utils.wrap_env(train_env, experiment['name'], record_t=experiment['record_train'])
     
     test_env = gym.make("CarRacing-v3", render_mode='rgb_array', domain_randomize=False, continuous=True)
-    test_env = utils.wrap_env(test_env, experiment['name'], record_t=1)
+    test_env = utils.wrap_env(test_env, experiment['name'])
 
-    agent = DQNAgent(env, experiment, log=False if debug else True)
+    agent = DQNAgent(train_env, experiment, log=False if debug else True)
     
     for e in range(experiment['params']['num_episodes']):
 
         start_str = 15*"=" + f"Episode {e+1}/{experiment['params']['num_episodes']} Start" + 15*"="
         print(start_str)
         
-        train(agent, env, 
+        train(agent, train_env, 
                 start_skip=experiment['params']['start_skip'],
                 stacked_neg=experiment['params']['stacked_neg'])
                     
-        if e % experiment['evaluation_step'] == 0:
+        if e % experiment['evaluation_step'] - 1 == 0:
             eval(agent, test_env, experiment['params']['start_skip'])
-        
-        pprint(agent.logger.stats)
         
         if agent.logger:
             agent.logger.sendLog()
             
         print("=" * len(start_str), "\n")
 
-    env.close()
+    train_env.close()
     test_env.close()
     
 
@@ -100,7 +96,7 @@ def train(agent: DQNAgent, env: gym.Env, start_skip: int, stacked_neg: int)->Non
             print("[TRAIN] | Info:", info)
             print("[TRAIN] | Steps:", step - start_skip)
             print("[TRAIN] | Tiles Visited:", env.unwrapped.tile_visited_count)
-            continue
+            return
 
         prev_observation = observation.detach().clone()
         

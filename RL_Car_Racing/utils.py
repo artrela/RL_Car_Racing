@@ -33,6 +33,7 @@ class WandBLogger:
                     "eps": 0.,
                     "tot_steps": 0.,
                     "epi_avg_rets": 0.,
+                    "epi_tot_rets": 0.,
                     "epi_avg_q": 0.,
                     "epi_avg_loss": 0.,
                     "tiles_visited": 0.,
@@ -88,7 +89,7 @@ class WandBLogger:
             stats are tracked
         """
         if name not in self.epi_stats.keys():
-            raise KeyError(f" '{name}' not in episode statistics tracker! Valid options are {self.stats.keys()}")
+            raise KeyError(f" '{name}' not in episode statistics tracker! Valid options are {self.epi_stats.keys()}")
         else:
             if val is not None: 
                 try: 
@@ -97,6 +98,7 @@ class WandBLogger:
                 except:
                     raise NotImplementedError(f"No handling for type {type(val)} exists")
             else:
+                print("Clearing:", name)
                 self.epi_stats[name].clear()
             
         return
@@ -115,7 +117,7 @@ class WandBLogger:
             float: return the average of the statistic
         """
         if name not in self.epi_stats.keys():
-            raise KeyError(f" '{name}' not in episode statistics tracker! Valid options are {self.stats.keys()}")
+            raise KeyError(f" '{name}' not in episode statistics tracker! Valid options are {self.epi_stats.keys()}")
         else:
             return sum(self.epi_stats[name]) / len(self.epi_stats[name])
         
@@ -133,7 +135,7 @@ class WandBLogger:
             float: return the sum of the statistic
         """
         if name not in self.epi_stats.keys():
-            raise KeyError(f" '{name}' not in episode statistics tracker! Valid options are {self.stats.keys()}")
+            raise KeyError(f" '{name}' not in episode statistics tracker! Valid options are {self.epi_stats.keys()}")
         else:
             return sum(self.epi_stats[name])
             

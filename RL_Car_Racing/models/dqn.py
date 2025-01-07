@@ -62,10 +62,10 @@ class DQNAgent():
             experiment (dict): A set of hyper parameters used to define the agent's characteristics
             log (bool): Whether or not to log the agent's results in WandB
         """
-        self.episode_steps = 1
-        self.current_episode = 0
+        self.current_episode:int = 0
+        self.total_steps: int = experiment['params']['start_skip'] # start after skipping
+        self.start_skip: int = experiment['params']['start_skip']
         self.episode_decay: int = experiment['params']['episode_decay']
-        self.total_steps: int = experiment['params']['start_skip']
         self.network_update: int = experiment['params']['step_update']
         self.target_update: int  = experiment['params']['target_update']
         self.epsilon_final: float = experiment['params']['epsilon']
@@ -77,14 +77,15 @@ class DQNAgent():
         self.seed = experiment['params']['random_seed']
         self.env = env
         self.action_space = ACTION_SPACE
+        self.episode_actions = [0 for _ in range(len(self.action_space))]
         
         # Set up net (for training), target net (for stability), and best net (for testing)
         self.q_net = QNetwork(action_space=len(self.action_space))
         self.target_net = QNetwork(action_space=len(self.action_space))
-        self.target_net.load_state_dict(self.q_net.state_dict())
-        self.target_net.eval()    
         self.best_net = QNetwork(action_space=len(self.action_space))
+        self.target_net.load_state_dict(self.q_net.state_dict())
         self.best_net.load_state_dict(self.q_net.state_dict())
+        self.target_net.eval()    
         self.best_net.eval()    
         self.device = self.q_net.device
         self.optim = torch.optim.AdamW(params=self.q_net.parameters(), lr=self.lr)
@@ -118,7 +119,7 @@ class DQNAgent():
         self.exp_replay.storeExperience(s0, a0, r0, s1, t)
         
         if self.total_steps % self.network_update == 0:
-
+            
             experiences = self.exp_replay.getRandomExperiences(self.batch_size)
             targets, actions, states = self._prepareMinibatch(experiences) 
             
@@ -127,10 +128,10 @@ class DQNAgent():
             
             losses = self.loss_fn(targets, q_pred)
             
+            print("Updating:", losses.item(), q_pred.detach().cpu().numpy().mean())
             if self.logger:
                 self.logger.trackStatistic("q_values", q_pred.detach().cpu().numpy().mean())
                 self.logger.trackStatistic("losses", losses.item())
-                self.logger.trackStatistic("returns", r0)
 
             self.optim.zero_grad()
             losses.backward()
@@ -139,6 +140,9 @@ class DQNAgent():
             del q_pred, targets, states
             gc.collect()
             torch.cuda.empty_cache()
+        
+        if self.logger:
+            self.logger.trackStatistic('returns', r0)
         
         next_action = self.selectAction()
         self._epsilonDecay()
@@ -158,7 +162,7 @@ class DQNAgent():
             
             step += 1
             s1, r0, ter, trunc, _ = self.env.step(self.action_space[a0])
-            if step < 30:
+            if step < self.start_skip:
                 continue
             
             a0 = random.randrange(0, len(self.action_space))
@@ -238,18 +242,20 @@ class DQNAgent():
             int: The chosen action
         """
         
-        if type(state) == torch.Tensor: 
+        if state is not None: 
             action = self.q_net(state.unsqueeze(0).to(self.device))
-            return torch.argmax(action).detach().cpu().int().numpy()
+            return torch.argmax(action).detach().cpu().int().item()
         
         P = random.random()
         if P > self.epsilon:
             with torch.no_grad(): 
                 state = self.exp_replay.getCurrentExperience().state
                 action = self.q_net(state.unsqueeze(0).to(self.device))
-                action = torch.argmax(action).detach().cpu().int().numpy()
+                action = torch.argmax(action).detach().cpu().int().item()
         else:
             action = random.randrange(0, len(self.action_space))
+            
+        self.episode_actions[action] += 1
             
         return action
 
@@ -263,6 +269,8 @@ class DQNAgent():
         """
         if episode_end:
             self.current_episode += 1
+            print("[TRAIN] | Actions Taken:", self.episode_actions)
+            self.episode_actions = [0 for _ in range(len(self.action_space))]
             
             if self.current_episode > 0 and self.logger:
                 
