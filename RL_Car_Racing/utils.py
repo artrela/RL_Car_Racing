@@ -98,7 +98,6 @@ class WandBLogger:
                 except:
                     raise NotImplementedError(f"No handling for type {type(val)} exists")
             else:
-                print("Clearing:", name)
                 self.epi_stats[name].clear()
             
         return

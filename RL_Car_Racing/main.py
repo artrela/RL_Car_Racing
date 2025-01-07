@@ -34,7 +34,7 @@ def main(experiment: dict, debug: bool)->None:
     train_env = utils.wrap_env(train_env, experiment['name'], record_t=experiment['record_video'])
     
     test_env = gym.make("CarRacing-v3", render_mode='rgb_array', domain_randomize=False, continuous=True)
-    test_env = utils.wrap_env(test_env, experiment['name'])
+    test_env = utils.wrap_env(test_env, experiment['name'], record_t=experiment['record_video'])
 
     agent = DQNAgent(train_env, experiment, log=False if debug else True)
     
@@ -47,8 +47,7 @@ def main(experiment: dict, debug: bool)->None:
                 start_skip=experiment['params']['start_skip'],
                 stacked_neg=experiment['params']['stacked_neg'])
                     
-        if e % experiment['record_video'] == 0:
-            eval(agent, test_env, experiment['params']['start_skip'])
+        eval(agent, test_env, experiment['params']['start_skip'])
         
         if agent.logger:
             agent.logger.sendLog()
