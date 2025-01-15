@@ -168,7 +168,7 @@ def parse_config(path: str)->dict:
         return config_dict
     
     
-def wrap_env(env: gym.Env, experiment_name: str, record_t: int=1)->gym.Env:
+def wrap_env(env: gym.Env, experiment_name: str, split: str="train", record_t: int=1)->gym.Env:
     """ Wrap an environment with given wrappers from the Gymnasium library. See 
     https://gymnasium.farama.org/api/wrappers/table/ for a list of wrappers given. 
     
@@ -177,6 +177,7 @@ def wrap_env(env: gym.Env, experiment_name: str, record_t: int=1)->gym.Env:
     Args:
         env (gymnasium.Env): A gymnasium environment. 
         experiment_name (str): The name to save the recoded videos that are trigger
+        split (str): If multiple env are being made, create a new split
         record_t (int): If not provided, save each time the env is reset. Useful for evaluation. 
             Defaults to 1.
 
@@ -191,7 +192,6 @@ def wrap_env(env: gym.Env, experiment_name: str, record_t: int=1)->gym.Env:
     env = gym.wrappers.TransformObservation(env, lambda x: x[:, :84, :84], env.observation_space)
     # place wrapper class calls here
     
-    split = "train" if record_t != 1 else "eval"
     env = gym.wrappers.RecordVideo(env, video_folder=f"./videos/{experiment_name}/{split}/", episode_trigger=lambda t: t % record_t == 0, 
                     disable_logger=True)
     
