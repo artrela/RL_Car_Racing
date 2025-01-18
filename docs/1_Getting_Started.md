@@ -23,6 +23,7 @@ pytest -m gym_install # test if install was successful
 Before moving forward, it is crucial that ones understands the Gymnasium API. It fairly straightforward, a great starting place is to reference the [Gymnasium website](https://gymnasium.farama.org/), at minumum the `Basic Usage` and `Training an Agent` sections. Additionally, reference the function in `tests/test_generic.py`, named `test_gym_install()` to get a feel for the interface. 
 
 
+### Sources
 ```
 @misc{towers2024gymnasiumstandardinterfacereinforcement,
       title={Gymnasium: A Standard Interface for Reinforcement Learning Environments}, 
