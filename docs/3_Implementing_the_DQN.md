@@ -22,4 +22,17 @@ Take a look at the following example below, which provides an example of tabular
 
 Deep Q-Networks (DQNs) are an extension to the generic Q-Learning, which arises as representations for a state become more complex. In the above example, notice how large the table for tracking Q-values is for 6 states. Imagine how many states would need to be stored for our example, which out of the box has an observation space of `Box(0, 255, (96, 96, 3), uint8)`. This expands to `256^(96 * 96 * 3) = 2^221,184` which is far beyond our ability to store. So what do we do? We can use a neural network to approximate the Q-Table! 
 
-## 3.1 
+## 3.1 Wrapping the Environment
+
+## 3.2 Creating the Q-Network
+
+## 3.3 What is Experience Replay?
+
+## 3.4 Creating a DQN Agent
+
+### 3.4.1 Balancing exploration & exploitation with an Epsilon-Greedy strategy
+
+### 3.4.2 Should the ratio of exploration & exploitation change over time?
+
+### 3.4.3 Training the model with the Bellman Equation
+
