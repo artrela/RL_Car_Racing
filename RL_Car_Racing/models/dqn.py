@@ -67,7 +67,6 @@ class DQNAgent():
         self.start_skip: int = experiment['params']['start_skip']
         self.episode_decay: int = experiment['params']['episode_decay']
         self.network_update: int = experiment['params']['step_update']
-        self.target_update: int  = experiment['params']['target_update']
         self.epsilon_final: float = experiment['params']['epsilon']
         self.epsilon: float = 1.
         self.gamma: float = experiment['params']['gamma']
@@ -81,11 +80,8 @@ class DQNAgent():
         
         # Set up net (for training), target net (for stability), and best net (for testing)
         self.q_net = QNetwork(action_space=len(self.action_space))
-        self.target_net = QNetwork(action_space=len(self.action_space))
         self.best_net = QNetwork(action_space=len(self.action_space))
-        self.target_net.load_state_dict(self.q_net.state_dict())
         self.best_net.load_state_dict(self.q_net.state_dict())
-        self.target_net.eval()    
         self.best_net.eval()    
         self.device = self.q_net.device
         self.optim = torch.optim.AdamW(params=self.q_net.parameters(), lr=self.lr)
@@ -93,7 +89,7 @@ class DQNAgent():
 
         # Logging related 
         self.logger = WandBLogger(experiment) if log else None
-        self.max_tiles = 0
+        self.max_tiles: int = 0
         
         return 
         
@@ -216,7 +212,7 @@ class DQNAgent():
             return torch.tensor(rj)
         else:
             with torch.no_grad():
-                Qs = self.target_net(sj.unsqueeze(0).to(self.device)).squeeze().cpu().numpy()
+                Qs = self.q_net(sj.unsqueeze(0).to(self.device)).squeeze().cpu().numpy()
                 
             return torch.tensor(rj + self.gamma * np.max(Qs)).float()
 
@@ -242,8 +238,9 @@ class DQNAgent():
         """
         
         if state is not None:
-            action = self.q_net(state.unsqueeze(0).to(self.device))
-            return torch.argmax(action).detach().cpu().int().item()
+            with torch.no_grad(): 
+                action = self.best_net(state.unsqueeze(0).to(self.device))
+                return torch.argmax(action).detach().cpu().int().item()
         
         P = random.random()
         if P > self.epsilon:
@@ -282,9 +279,6 @@ class DQNAgent():
                 self.logger.trackStatistic("returns")            
                 self.logger.trackStatistic("q_values")            
                 self.logger.trackStatistic("losses")    
-                
-            if self.current_episode % self.target_update == 0:
-                self.target_net.load_state_dict(self.q_net.state_dict())
 
         self.total_steps += 1
         
@@ -350,9 +344,6 @@ class ExperienceReplay():
             t (bool): Was a terminal state reached. 
 
         """
-        if len(self._replay_memory) == self._replay_memory.maxlen:
-            self._replay_memory.popleft()
-
         new_experience = self.Experience(s0, a0, r0, s1, t)
         self._replay_memory.append(new_experience)
         
