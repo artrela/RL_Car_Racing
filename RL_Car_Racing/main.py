@@ -17,6 +17,7 @@ import gymnasium as gym
 
 import utils
 from models.dqn import DQNAgent
+from models.ddqn import DDQNAgent
 
 
 def main(experiment: dict, debug: bool)->None:
@@ -36,7 +37,12 @@ def main(experiment: dict, debug: bool)->None:
     test_env = gym.make("CarRacing-v3", render_mode='rgb_array', domain_randomize=False, continuous=True)
     test_env = utils.wrap_env(test_env, experiment['name'], split="eval", record_t=experiment['record_video'])
 
-    agent = DQNAgent(train_env, experiment, log=False if debug else True)
+    if experiment['params']['model'] == 'DQN':
+        agent = DQNAgent(train_env, experiment, log=False if debug else True)
+    elif experiment['params']['model'] == 'DDQN':
+        agent = DDQNAgent(train_env, experiment, log=False if debug else True)
+    else:
+        raise NotImplementedError
     
     for e in range(experiment['params']['num_episodes']):
 
