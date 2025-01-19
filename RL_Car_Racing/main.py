@@ -18,6 +18,7 @@ import gymnasium as gym
 import utils
 from models.dqn import DQNAgent
 from models.ddqn import DDQNAgent
+from typing import Union
 
 
 def main(experiment: dict, debug: bool)->None:
@@ -64,7 +65,7 @@ def main(experiment: dict, debug: bool)->None:
     test_env.close()
     
 
-def train(agent: DQNAgent, env: gym.Env)->None:
+def train(agent: Union[DQNAgent, DDQNAgent], env: gym.Env)->None:
     """ Train the agent, which may include steps not seen during evaluation
     
     **May need to add another parameter(s) to this function
@@ -76,7 +77,7 @@ def train(agent: DQNAgent, env: gym.Env)->None:
     raise NotImplementedError
         
 
-def eval(agent: DQNAgent, env: gym.Env)->None:
+def eval(agent: Union[DQNAgent, DDQNAgent], env: gym.Env)->None:
     """ Evaluate the agent, using the agent that has amassed the highest training tiles during training,
     with no exploration. 
     
