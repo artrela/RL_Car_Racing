@@ -38,18 +38,8 @@ import torch
 #    represents full braking.
 # 
 # ==============================================================================
-ACTION_SPACE: List[np.ndarray] = [
-        np.array([    0, 0.8,    0]), # all gas, no break
-        np.array([    0, 0.6,    0]), # all gas, no break
-        np.array([    0, 0.4,    0]), # all gas, no break
-        np.array([-0.67,   0,    0]), # soft left
-        np.array([ 0.67,   0,    0]), # soft right
-        np.array([-0.33,   0,    0]), # softer left
-        np.array([ 0.33,   0,    0]), # softer right
-        np.array([    0,   0,  0.3]), # break
-        np.array([    0,   0, 0.15]), # break
-        np.array([    0,   0,    0])  # do nothing
-    ]
+ACTION_SPACE: List[np.ndarray] = []
+
 class DQNAgent():
     def __init__(self, env: gymnasium.Env, experiment: dict, log: bool):
         """ A DQN agent for driving the Car Racing environment. 
@@ -59,34 +49,24 @@ class DQNAgent():
             experiment (dict): A set of hyper parameters used to define the agent's characteristics
             log (bool): Whether or not to log the agent's results in WandB
         """
-        self.current_episode:int = 0
-        self.total_steps: int = experiment['params']['start_skip'] # start after skipping
-        self.start_skip: int = experiment['params']['start_skip']
-        self.episode_decay: int = experiment['params']['episode_decay']
-        self.network_update: int = experiment['params']['step_update']
-        self.epsilon_final: float = experiment['params']['epsilon']
-        self.epsilon: float = 1.
-        self.gamma: float = experiment['params']['gamma']
-        self.lr: float = experiment['params']['learning_rate']
-        self.batch_size:int = experiment['params']['batch_size']
-        self.seed: int = experiment['params']['random_seed']
+        
+        # ===== Transfer Import Hyperparamers to Class Atrributes =========
+        
+        # ===== Transfer Import Hyperparamers to Class Atrributes =========
+        
+        # ======= Set up net (for training), and best net (for testing) ===
+        
+        # ======= Set up net (for training), and best net (for testing) ===
+        
         self.exp_replay = ExperienceReplay(experiment['params']['mem_len'])
         self.env = env
         self.action_space = ACTION_SPACE
         self.episode_actions = [0 for _ in range(len(self.action_space))]
-        
-        # Set up net (for training), target net (for stability), and best net (for testing)
-        self.q_net = QNetwork(action_space=len(self.action_space))
-        self.best_net = QNetwork(action_space=len(self.action_space))
-        self.best_net.load_state_dict(self.q_net.state_dict())
-        self.best_net.eval()    
-        self.device = self.q_net.device
-        self.optim = torch.optim.AdamW(params=self.q_net.parameters(), lr=self.lr)
-        self.loss_fn = torch.nn.MSELoss()
 
         # Logging related 
         self.logger = WandBLogger(experiment) if log else None
         self.max_tiles: int = 0
+        self.current_episode: int = 1
         
         return 
         
@@ -109,61 +89,15 @@ class DQNAgent():
         Returns:
             int: What is the next action we should take, given our epsilon greedy strategy?
         """
-        self.exp_replay.storeExperience(s0, a0, r0, s1, t)
-        
-        if self.total_steps % self.network_update == 0:
-            
-            experiences = self.exp_replay.getRandomExperiences(self.batch_size)
-            targets, actions, states = self._prepareMinibatch(experiences) 
-            
-            rows = torch.arange(self.batch_size).to(self.device)
-            q_pred = self.q_net(states)[rows, actions]
-            
-            losses = self.loss_fn(targets, q_pred)
-            
-            if self.logger:
-                self.logger.trackStatistic("q_values", q_pred.detach().cpu().numpy().mean())
-                self.logger.trackStatistic("losses", losses.item())
-
-            self.optim.zero_grad()
-            losses.backward()
-            self.optim.step()
-
-            del q_pred, targets, states
-            gc.collect()
-            torch.cuda.empty_cache()
-        
-        if self.logger:
-            self.logger.trackStatistic('returns', r0)
-        
-        next_action = self.selectAction()
-        self._epsilonDecay()
-        self._trackProgress(t) 
-        
-        return next_action
+        raise NotImplementedError
 
     
     def fillMemory(self):
         """ A helper function to assist the agent by filling its memory before the first
         episode with random actions. 
         """
-        s0, _ = self.env.reset(seed=self.seed)
+        raise NotImplementedError
 
-        step, a0 = 0, 0
-        while len(self.exp_replay) < self.batch_size:
-            
-            step += 1
-            s1, r0, ter, trunc, _ = self.env.step(self.action_space[a0])
-            if step < self.start_skip:
-                continue
-            
-            a0 = random.randint(0, len(self.action_space)-1)
-            self.exp_replay.storeExperience(s0, a0, r0, s1, ter or trunc)
-        
-        self.env.reset(seed=self.seed)
-
-        return
-    
 
     def _prepareMinibatch(self, experiences: List[NamedTuple]):
         """ Given some experiences, generate a minibatch from them. 
@@ -180,13 +114,7 @@ class DQNAgent():
         Returns:
             tuple: a return of targets, actions, and states
         """
-        targets = torch.stack([self.yj(memory.terminal, memory.reward, memory.next_state)
-                            for memory in experiences], dim=0).squeeze().to(self.device)
-        
-        states  = torch.stack([memory.state for memory in experiences], dim=0).to(self.device)
-        actions  = torch.tensor(np.array([memory.action for memory in experiences])).to(self.device)
-
-        return targets, actions, states
+        raise NotImplementedError
     
     
     def yj(self, tj: bool, rj: float, sj: torch.Tensor)->torch.Tensor:
@@ -205,20 +133,13 @@ class DQNAgent():
         Returns:
             torch.Tensor: The Q value for the given experience context
         """
-        if tj:
-            return torch.tensor(rj)
-        else:
-            with torch.no_grad():
-                Qs = self.q_net(sj.unsqueeze(0).to(self.device)).squeeze().cpu().numpy()
-                
-            return torch.tensor(rj + self.gamma * np.max(Qs)).float()
+        raise NotImplementedError
 
 
     def _epsilonDecay(self)->None:
         """ Linearlly anneal the towards the target epsilon over self.episode_decay episodes. 
         """
-        self.epsilon = max((self.episode_decay - self.current_episode) / self.episode_decay, self.epsilon_final)
-        return
+        raise NotImplementedError
 
 
     def selectAction(self, state: Optional[torch.Tensor]=None)->int:
@@ -233,24 +154,7 @@ class DQNAgent():
         Returns:
             int: The chosen action
         """
-        
-        if state is not None:
-            with torch.no_grad(): 
-                action = self.best_net(state.unsqueeze(0).to(self.device))
-                return torch.argmax(action).detach().cpu().int().item()
-        
-        P = random.random()
-        if P > self.epsilon:
-            with torch.no_grad(): 
-                state = self.exp_replay.getCurrentExperience().state
-                action = self.q_net(state.unsqueeze(0).to(self.device))
-                action = torch.argmax(action).detach().cpu().int().item()
-        else:
-            action = random.randint(0, len(self.action_space)-1)
-            
-        self.episode_actions[action] += 1
-            
-        return action
+        raise NotImplementedError
 
 
     def _trackProgress(self, episode_end:bool)->None:
@@ -262,7 +166,6 @@ class DQNAgent():
         """
         if episode_end:
             self.current_episode += 1
-            # print("[TRAIN] | Actions Taken:", self.episode_actions)
             self.episode_actions = [0 for _ in range(len(self.action_space))]
             
             if self.current_episode > 0 and self.logger:
@@ -283,9 +186,9 @@ class DQNAgent():
             self.logger.setStatistic("tot_steps", step=True)
             self.logger.setStatistic("eps", self.epsilon)
 
+        # Number of tiles visited by the agent is a good proxy for learning
         if self.env.unwrapped.tile_visited_count > self.max_tiles:
-            self.max_tiles = self.env.unwrapped.tile_visited_count
-            self.best_net.load_state_dict(self.q_net.state_dict())
+            raise NotImplementedError
 
         return
         
@@ -293,25 +196,10 @@ class DQNAgent():
 class QNetwork(torch.nn.Module):
     def __init__(self, action_space: int):
         super().__init__()
-
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.model =  torch.nn.Sequential(*[
-            torch.nn.Conv2d(in_channels=4, out_channels=16, kernel_size=8, stride=4),
-            torch.nn.ReLU(),
-            torch.nn.Conv2d(in_channels=16, out_channels=32, kernel_size=4, stride=2),
-            torch.nn.ReLU(),
-            torch.nn.Flatten(),
-            torch.nn.Linear(in_features=2592, out_features=256),
-            torch.nn.ReLU(),
-            torch.nn.Linear(in_features=256, out_features=128),
-            torch.nn.ReLU(),
-            torch.nn.Linear(in_features=128, out_features=64),
-            torch.nn.ReLU(),
-            torch.nn.Linear(in_features=64, out_features=action_space)
-        ]).to(self.device)
+        raise NotImplementedError
 
     def forward(self, x):
-        return self.model(x)
+        raise NotImplementedError
 
 
 class ExperienceReplay():
@@ -326,8 +214,6 @@ class ExperienceReplay():
             memory_length (int): size of the memory
         """
         self.Experience = namedtuple("Experience", ["state", "action", "reward", "next_state", "terminal"])
-        self._replay_memory = deque(maxlen=memory_length)
-        self.memory_length = memory_length
 
 
     def storeExperience(self, s0: torch.Tensor, a0: int, r0: float, s1: torch.Tensor, t: bool)->None:
@@ -341,10 +227,7 @@ class ExperienceReplay():
             t (bool): Was a terminal state reached. 
 
         """
-        new_experience = self.Experience(s0, a0, r0, s1, t)
-        self._replay_memory.append(new_experience)
-        
-        return
+        raise NotImplementedError
     
 
     def getRandomExperiences(self, batch_size: int)->List[NamedTuple]:
@@ -356,19 +239,18 @@ class ExperienceReplay():
         Returns:
             List[NamedTuple]: List of memories. 
         """
-        return random.choices(self._replay_memory, 
-                            weights=[i+1 for i in range(len(self._replay_memory))], 
-                            k=batch_size)
+        raise NotImplementedError
+
     
     def getCurrentExperience(self):
-        return self._replay_memory[-1]
+        raise NotImplementedError
     
     def getCapacity(self):
-        return len(self._replay_memory) / self.memory_length * 100
+        raise NotImplementedError
     
     def isFull(self):
-        return len(self._replay_memory) == self.memory_length
+        raise NotImplementedError
 
     def __len__(self):
-        return len(self._replay_memory)
+        raise NotImplementedError
 

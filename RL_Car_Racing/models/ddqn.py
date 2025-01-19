@@ -8,11 +8,11 @@ class DDQNAgent(DQNAgent):
     def __init__(self, env: gym.Env, experiment: dict, log: bool):
         super().__init__(env, experiment, log)
         
-        self.target_update: int  = experiment['params']['target_update']
+        # ====== Your code goes here ========  
         
-        self.target_net = QNetwork(action_space=len(self.action_space))
-        self.target_net.load_state_dict(self.q_net.state_dict())
-        self.target_net.eval()    
+        
+        
+        # ====== Your code goes here ========  
 
     def yj(self, tj: bool, rj: float, sj: torch.Tensor)->torch.Tensor:
         """ 
@@ -33,13 +33,7 @@ class DDQNAgent(DQNAgent):
         Returns:
             torch.Tensor: The Q value for the given experience context
         """
-        if tj:
-            return torch.tensor(rj)
-        else:
-            with torch.no_grad():
-                Qs = self.target_net(sj.unsqueeze(0).to(self.device)).squeeze().cpu().numpy()
-                
-            return torch.tensor(rj + self.gamma * np.max(Qs)).float()
+        raise NotImplementedError
 
     def _trackProgress(self, episode_end:bool)->None:
         """ Implement some 'catch all' logic to interface with the wandb logger. 
@@ -52,11 +46,5 @@ class DDQNAgent(DQNAgent):
             use this as a flag for that. 
         """
         
-        super()._trackProgress(episode_end)
-        
-        if episode_end:    
-            if self.current_episode % self.target_update == 0:
-                self.target_net.load_state_dict(self.q_net.state_dict())
-
-        return
+        raise NotImplementedError
         

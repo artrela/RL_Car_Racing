@@ -185,12 +185,11 @@ def wrap_env(env: gym.Env, experiment_name: str, split: str="train", record_t: i
         gymnasium.Env: A wrapped environment
     """
     
-    # place wrapper class calls here
-    env = gym.wrappers.GrayscaleObservation(env, keep_dim=False)
-    env = gym.wrappers.FrameStackObservation(env, stack_size=4)
-    env = gym.wrappers.TransformObservation(env, lambda x: torch.tensor(x).float(), env.observation_space)
-    env = gym.wrappers.TransformObservation(env, lambda x: x[:, :84, :84], env.observation_space)
-    # place wrapper class calls here
+    # ====== Your code goes here ========  
+        
+        
+        
+    # ====== Your code goes here ========  
     
     env = gym.wrappers.RecordVideo(env, video_folder=f"./videos/{experiment_name}/{split}/", episode_trigger=lambda t: t % record_t == 0, 
                     disable_logger=True)

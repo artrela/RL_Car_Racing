@@ -49,11 +49,11 @@ def main(experiment: dict, debug: bool)->None:
         start_str = 15*"=" + f"Episode {e+1}/{experiment['params']['num_episodes']} Start" + 15*"="
         print(start_str)
         
-        train(agent, train_env, 
-                start_skip=experiment['params']['start_skip'],
-                stacked_neg=experiment['params']['stacked_neg'])
-                    
-        eval(agent, test_env, experiment['params']['start_skip'])
+        # ====== Your code goes here ========  
+        
+        
+        
+        # ====== Your code goes here ========  
         
         if agent.logger:
             agent.logger.sendLog()
@@ -64,78 +64,29 @@ def main(experiment: dict, debug: bool)->None:
     test_env.close()
     
 
-def train(agent: DQNAgent, env: gym.Env, start_skip: int, stacked_neg: int)->None:
-    """ Train the agent, which may include steps not seen during evaluatoin
+def train(agent: DQNAgent, env: gym.Env)->None:
+    """ Train the agent, which may include steps not seen during evaluation
+    
+    **May need to add another parameter(s) to this function
     
     Args:
         agent (DQNAgent): The RL agent
         env (gym.Env): The train environment
-        start_skip (int): To skip frames at the beginning of the episode
-        stack_neg (int): The amount of allowable negative rewards in a row before the
-            environment resets. 
     """
-    prev_observation, info = env.reset(seed=experiment['params']['random_seed'])
-    terminated = truncated = False
-    
-    action, consec_neg, step = -1, 0, 0
-    while not (terminated or truncated):
-        
-        step += 1
-        observation, reward, terminated, truncated, info = env.step(agent.action_space[action])
-        if step < start_skip:
-            continue
-        
-        if reward < 0:
-            consec_neg += 1
-            reward = 0
-        else:
-            consec_neg = 0
-        
-        if consec_neg > stacked_neg:
-            truncated = True
-            info["Continuous Negatives"] = True
-        
-        action = agent(prev_observation, action, reward, observation, terminated or truncated)
-                                
-        if terminated or truncated:
-            print("[TRAIN] | Info:", info)
-            print("[TRAIN] | Steps:", step - start_skip)
-            print("[TRAIN] | Tiles Visited:", env.unwrapped.tile_visited_count)
-            return
-
-        prev_observation = observation.detach().clone()
+    raise NotImplementedError
         
 
-def eval(agent: DQNAgent, env: gym.Env, start_skip: int)->None:
+def eval(agent: DQNAgent, env: gym.Env)->None:
     """ Evaluate the agent, using the agent that has amassed the highest training tiles during training,
     with no exploration. 
+    
+    **May need to add another parameter to this function
 
     Args:
         agent (DQNAgent): The trained RL agent
         env (gym.Env): The test environment
-        start_skip (int): To skip frames at the beginning of the episode
     """
-    
-    env.reset(seed=experiment['params']['random_seed'])
-    terminated = truncated = False
-    
-    action, step = -1, 0
-    while not (terminated or truncated):
-        
-        step += 1
-        observation, reward, terminated, truncated, info = env.step(agent.action_space[action])
-        if step < start_skip:
-            continue
-        
-        action = agent.selectAction(state=observation)
-        
-        if agent.logger:
-            agent.logger.setStatistic('eval_tiles_visited', env.unwrapped.tile_visited_count)
-                                
-        if terminated or truncated:
-            print("[EVAL] | Info:", info)
-            print("[EVAL] | Tiles Visited:", env.unwrapped.tile_visited_count)
-            return
+    raise NotImplementedError
 
 
 if __name__ == "__main__":
