@@ -1,0 +1,65 @@
+# ==============================================================================
+# Created by: Alec Trela
+# GitHub: https://github.com/artrela
+# Description: Parameters to track your experiments. These are the default parameters 
+# that are also tracked by the agent & logger. Feel free to expand based on your needs
+#
+# This is included as a part of the MRSD bootcamp, meant to be a primer for students
+# entering their first year of the program at Carnegie Mellon University 
+# 
+# Feel free to use, modify, and share this file. Attribution is appreciated! 
+# For more information, visit my GitHub or 
+# https://github.com/RoboticsKnowledgebase/mrsd-software-bootcamp.
+# ==============================================================================
+
+# ==============================================================================
+# Parameters:
+# - name: Identifier for the configuration profile. This will appear on weight & 
+#     biases as the run name
+# - evaluation_step: Interval (in steps) for evaluating the agent's performance.
+# - record_train: Interval (in steps) for recording training metrics.
+# - params:
+#   - skip_start: How many frames to skip at the start of the episode
+#   - stacked_neg: How many negative rewards can you use in a row until the environment is reset.
+#        This is a useful proxy for the model to learn to stay near the road. 
+#   - num_episodes: Total number of episodes to train the agent.
+#   - episode_decay: Number of episodes over which epsilon decays.
+#   - mem_len: Maximum size of the replay buffer.
+#   - random_seed: Seed for random number generation (ensures reproducibility).
+#   - batch_size: Number of experiences sampled per training step.
+#   - step_update: Interval (in steps) for updating the main network.
+#   - target_update: Interval (in steps) for updating the target network.
+#   - gamma: Discount factor for future rewards.
+#   - learning_rate: Learning rate for the optimizer.
+#   - epsilon: Exploration rate for the epsilon-greedy policy.
+#   - model: Name of the model architecture (e.g., DQN).
+#   - optimizer: Optimizer used for training (e.g., AdamW).
+#   - loss: Loss function used during training (e.g., MSE).
+#   - notes: Additional notes or comments about the configuration. Can be as long as needed. 
+#
+# Usage:
+# - Use this configuration file to initialize training parameters for the RL agent.
+# - Example: python3 main.py -c <path_to_file>
+#
+# ==============================================================================
+
+name: 'default'
+record_video: !!int 50
+params:
+  start_skip: !!int 30
+  stacked_neg: !!int 60
+  num_episodes: !!int 5000
+  episode_decay: !!int 2000
+  mem_len: !!int 100000
+  random_seed: !!int 1
+  batch_size: !!int 64
+  step_update: !!int 20
+  target_update: !!int 2  
+  gamma: !!float 0.95
+  learning_rate: !!float 0.0005
+  epsilon: !!float 0.1
+  model: !!str 'DQN'
+  optimizer: !!str "AdamW"
+  loss: !!str "MSE"
+  notes: !!str "default settings"
+  
