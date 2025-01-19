@@ -44,22 +44,22 @@
 # ==============================================================================
 
 name: 'default'
-record_video: !!int 50
+record_video: !!int -1
 params:
-  start_skip: !!int 30
-  stacked_neg: !!int 60
-  num_episodes: !!int 5000
-  episode_decay: !!int 2000
-  mem_len: !!int 100000
-  random_seed: !!int 1
-  batch_size: !!int 64
-  step_update: !!int 20
+  start_skip: !!int -1
+  stacked_neg: !!int -1
+  num_episodes: !!int -1
+  episode_decay: !!int -1
+  mem_len: !!int -1
+  random_seed: !!int -1
+  batch_size: !!int -1
+  step_update: !!int -1
   target_update: !!int 2  
-  gamma: !!float 0.95
-  learning_rate: !!float 0.0005
-  epsilon: !!float 0.1
+  gamma: !!float 0.0
+  learning_rate: !!float 0.0
+  epsilon: !!float 0.0
   model: !!str 'DQN'
-  optimizer: !!str "AdamW"
-  loss: !!str "MSE"
+  optimizer: !!str "nan"
+  loss: !!str "nan"
   notes: !!str "default settings"
   
