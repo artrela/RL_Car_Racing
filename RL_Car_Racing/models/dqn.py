@@ -39,20 +39,17 @@ import torch
 # 
 # ==============================================================================
 ACTION_SPACE: List[np.ndarray] = [
-        np.array([    0,   1,    0]), # all gas, no break
         np.array([    0, 0.8,    0]), # all gas, no break
-        np.array([   -1,   0,    0]), # hard left
-        np.array([    1,   0,    0]), # hard right
+        np.array([    0, 0.6,    0]), # all gas, no break
+        np.array([    0, 0.4,    0]), # all gas, no break
         np.array([-0.67,   0,    0]), # soft left
-        np.array([ 0.67,   0,    0]), # soft left
-        np.array([-0.33,   0,    0]), # soft right
-        np.array([ 0.33,   0,    0]), # soft right
-        np.array([    0,   0,  1.0]), # break left
-        np.array([    0,   0, 0.67]), # break left
-        np.array([    0,   0,  0.3]), # break right
+        np.array([ 0.67,   0,    0]), # soft right
+        np.array([-0.33,   0,    0]), # softer left
+        np.array([ 0.33,   0,    0]), # softer right
+        np.array([    0,   0,  0.3]), # break
+        np.array([    0,   0, 0.15]), # break
         np.array([    0,   0,    0])  # do nothing
     ]
-
 class DQNAgent():
     def __init__(self, env: gymnasium.Env, experiment: dict, log: bool):
         """ A DQN agent for driving the Car Racing environment. 
