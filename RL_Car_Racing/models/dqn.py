@@ -38,31 +38,19 @@ import torch
 #    represents full braking.
 # 
 # ==============================================================================
-ACTION_SPACE: List[np.ndarray] = []
+ACTION_SPACE = []
 
 class DQNAgent():
-    def __init__(self, env: gymnasium.Env, experiment: dict, log: bool):
+    def __init__(self, env, experiment, log):
         """ A DQN agent for driving the Car Racing environment. 
-
-        Args:
-            env (gymnasium.Env): Car racing environment
-            experiment (dict): A set of hyper parameters used to define the agent's characteristics
-            log (bool): Whether or not to log the agent's results in WandB
         """
         
-        # ===== Transfer Import Hyperparamers to Class Atrributes =========
+        # ========= your code goes here ===============
         
-        # ===== Transfer Import Hyperparamers to Class Atrributes =========
         
-        # ======= Set up net (for training), and best net (for testing) ===
         
-        # ======= Set up net (for training), and best net (for testing) ===
+        # ========= your code goes here ===============
         
-        self.exp_replay = ExperienceReplay(experiment['params']['mem_len'])
-        self.env = env
-        self.action_space = ACTION_SPACE
-        self.episode_actions = [0 for _ in range(len(self.action_space))]
-
         # Logging related 
         self.logger = WandBLogger(experiment) if log else None
         self.max_tiles: int = 0
@@ -71,23 +59,8 @@ class DQNAgent():
         return 
         
 
-    def __call__(self, s0: torch.Tensor, a0: int, r0: float, s1: torch.Tensor, t: bool)->int:
+    def __call__(self, s0, a0, r0, s1, t):
         """ Given the required information for an experience, take the necessary steps to train the agent. 
-        
-        1. Store the new experience
-        2. Train the model
-        3. Select the next action you should take
-        4. Reduce exploration via epsilon decay
-
-        Args:
-            s0 (torch.Tensor): The previous observation
-            a0 (int): The action taken to transition from the previous observation to new observation
-            r0 (float): The reward for the given action 
-            s1 (torch.Tensor): The observation seen as a result of the action 
-            t (bool): Was a terminal state reached. 
-
-        Returns:
-            int: What is the next action we should take, given our epsilon greedy strategy?
         """
         raise NotImplementedError
 
@@ -99,65 +72,43 @@ class DQNAgent():
         raise NotImplementedError
 
 
-    def _prepareMinibatch(self, experiences: List[NamedTuple]):
+    def _prepareMinibatch(self, experiences):
         """ Given some experiences, generate a minibatch from them. 
         
         For states and actions, this means loading extraction from the experience and loading 
         to the device. 
         
         Targets must be passed through the target function. 
-
-        Args:
-            experiences (List[namedtuple]): Includes entries from 
-                ["state", "action", "reward", "next_state", "terminal"]
-
-        Returns:
-            tuple: a return of targets, actions, and states
         """
         raise NotImplementedError
     
     
-    def yj(self, tj: bool, rj: float, sj: torch.Tensor)->torch.Tensor:
+    def yj(self, tj, rj, sj):
         """ 
         Compute y_j as described in https://arxiv.org/pdf/1312.5602, using the Bellman Equation. 
         If the state is terminal (t_j), then no future rewards can exist, so just return the future reward. 
         
         Otherwise, we must use the Bellman Equation to find the discounted future reward that would be taken
         if you took the best possible action. 
-
-        Args:
-            tj (bool): Is the state terminal
-            rj (float): Current reward for the experience
-            sj (torch.Tensor): The current state for which the reward was observerd. 
-
-        Returns:
-            torch.Tensor: The Q value for the given experience context
         """
         raise NotImplementedError
 
 
-    def _epsilonDecay(self)->None:
+    def _epsilonDecay(self):
         """ Linearlly anneal the towards the target epsilon over self.episode_decay episodes. 
         """
         raise NotImplementedError
 
 
-    def selectAction(self, state: Optional[torch.Tensor]=None)->int:
+    def selectAction(self, state):
         """ 
         Select an action. If the state is not provided already, implement an 
         epsilon greedy strategy on the most recent state on the replay buffer. 
-
-        Args:
-            state (Optional[torch.Tensor], optional): A given state to 
-            run the best policy on. Defaults to None.
-
-        Returns:
-            int: The chosen action
         """
         raise NotImplementedError
 
 
-    def _trackProgress(self, episode_end:bool)->None:
+    def _trackProgress(self, episode_end):
         """ Implement some 'catch all' logic to interface with the wandb logger. 
 
         Args:
@@ -194,7 +145,7 @@ class DQNAgent():
         
 
 class QNetwork(torch.nn.Module):
-    def __init__(self, action_space: int):
+    def __init__(self, action_space):
         super().__init__()
         raise NotImplementedError
 
@@ -209,14 +160,11 @@ class ExperienceReplay():
         The basis for the Bellman Equation is that observations are independent of each other. 
         In many of the gymnasium settings, this assumption does not hold. To help get closer to this assumption, we can 
         pulling randomly from a set of memories to reduce their correlation. 
-
-        Args:
-            memory_length (int): size of the memory
         """
         self.Experience = namedtuple("Experience", ["state", "action", "reward", "next_state", "terminal"])
 
 
-    def storeExperience(self, s0: torch.Tensor, a0: int, r0: float, s1: torch.Tensor, t: bool)->None:
+    def storeExperience(self, s0, a0, r0, s1, t):
         """ Store an experience of the agent. If the memory is full, throw away the oldest one. 
 
         Args:
@@ -230,7 +178,7 @@ class ExperienceReplay():
         raise NotImplementedError
     
 
-    def getRandomExperiences(self, batch_size: int)->List[NamedTuple]:
+    def getRandomExperiences(self, batch_size):
         """Return a list of experiences. May be a good idea to do some prioritzed memory buffer here. 
 
         Args:

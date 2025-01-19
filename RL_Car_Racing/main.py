@@ -18,17 +18,13 @@ import gymnasium as gym
 import utils
 from models.dqn import DQNAgent
 from models.ddqn import DDQNAgent
+from typing import Union
 
 
-def main(experiment: dict, debug: bool)->None:
+def main(experiment, debug):
     """
     Train an RL agent to drive in the Gymnasium environment 'CarRacing-v3', using hyperparameters specified in a 
     configuration yaml file. See 'RL_Car_Racing/config/default.yaml' as a starting point.
-
-    Args:
-        experiment (dict): A set of parameters to define the experiement. High level markers are 'params' and 
-        'name'. 
-        debug (bool): Forgoes wandb logging for debugging purposes 
     """
 
     train_env = gym.make("CarRacing-v3", render_mode='rgb_array', domain_randomize=False, continuous=True)
@@ -64,27 +60,20 @@ def main(experiment: dict, debug: bool)->None:
     test_env.close()
     
 
-def train(agent: DQNAgent, env: gym.Env)->None:
+def train(agent, env):
     """ Train the agent, which may include steps not seen during evaluation
     
     **May need to add another parameter(s) to this function
-    
-    Args:
-        agent (DQNAgent): The RL agent
-        env (gym.Env): The train environment
     """
     raise NotImplementedError
         
 
-def eval(agent: DQNAgent, env: gym.Env)->None:
+def eval(agent, env):
     """ Evaluate the agent, using the agent that has amassed the highest training tiles during training,
     with no exploration. 
     
     **May need to add another parameter to this function
 
-    Args:
-        agent (DQNAgent): The trained RL agent
-        env (gym.Env): The test environment
     """
     raise NotImplementedError
 
