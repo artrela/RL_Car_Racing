@@ -26,3 +26,7 @@ and a set of actions to choose from.
 ## Getting Started
 Head over to `docs` to get started!
 
+Note that since this is an assigment, there are solutions which can be found at the `solutions` branch. However, the solution to this assignment is not unique, there are likely countless ways to obtain a driving agent. I would urge you to attempt as much of this assignment on your own as possible and only resort to the solutions after countless attempts. 
+
+If you are looking for an even harder approach of this problem, head to the `hard` branch where I remove informative docstrings and typehinting which requires you to really know your stuff. 
+
